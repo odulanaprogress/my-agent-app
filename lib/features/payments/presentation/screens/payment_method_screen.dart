@@ -374,13 +374,33 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                       ],
                     ),
                   ),
-                  Radio<String>(
-                    value: value,
-                    groupValue: _selectedPayment,
-                    onChanged: (val) {
-                      setState(() => _selectedPayment = val);
-                    },
-                    activeColor: const Color(0xFF0F172A),
+                  GestureDetector(
+                    onTap: () => setState(() => _selectedPayment = value),
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF0F172A)
+                              : Colors.grey.shade400,
+                          width: 2,
+                        ),
+                      ),
+                      child: isSelected
+                          ? Center(
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
                   ),
                 ],
               ),
