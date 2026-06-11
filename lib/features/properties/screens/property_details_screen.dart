@@ -330,27 +330,82 @@ class _PropertyDetailsScreenState
                             _snack('Could not open map: $e');
                           }
                         },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                              width: 1,
+                            ),
+                          ),
                           child: Row(
                             children: [
-                              const Icon(Icons.location_on,
-                                  size: 16, color: Color(0xFF6366F1)),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  '${p.address}, ${p.community}, ${p.state}',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 13,
-                                    decoration: TextDecoration.underline,
-                                  ),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.location_on_rounded,
+                                  size: 20,
+                                  color: Color(0xFF6366F1),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.map_outlined,
-                                  size: 16, color: Color(0xFF6366F1)),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'LOCATION',
+                                      style: TextStyle(
+                                        color: Color(0xFF0F172A),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${p.address}, ${p.community}, ${p.state}',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: const Color(0xFF6366F1).withValues(alpha: 0.25),
+                                    width: 1,
+                                  ),
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.directions_outlined,
+                                  size: 18,
+                                  color: Color(0xFF6366F1),
+                                ),
+                              ),
                             ],
                           ),
                         ),
