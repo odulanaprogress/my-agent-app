@@ -12,6 +12,14 @@
 .swiftpm/
 migrate_working_dir/
 
+# Secret files — NEVER commit these
+.env
+.env.*
+!.env.example
+web/.env
+google-services.json
+GoogleService-Info.plist
+
 # IntelliJ related
 *.iml
 *.ipr
