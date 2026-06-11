@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/user_behavior_service.dart';
 
 /// Support & Inquiry screen — lets tenants send messages to the platform
 /// support / agent team. Messages are stored in `support_tickets/{uid}/messages`.
@@ -38,13 +39,35 @@ class _SupportInquiryScreenState extends State<SupportInquiryScreen> {
         'isRead': false,
       });
 
-      // Also write ticket header for admin to see
-      await _firestore.collection('support_tickets').doc(_uid).set({
+      final user = FirebaseAuth.instance.currentUser;
+      final Map<String, dynamic> ticketData = {
         'uid': _uid,
+        'userId': _uid,
         'lastMessage': text,
         'updatedAt': FieldValue.serverTimestamp(),
         'status': 'open',
-      }, SetOptions(merge: true));
+      };
+
+      if (user != null) {
+        ticketData['userEmail'] = user.email ?? '';
+        final userDoc = await _firestore.collection('users').doc(_uid).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          ticketData['userName'] = userData?['fullName'] ?? 'Unknown';
+        }
+      }
+
+      final ticketSnap = await _firestore.collection('support_tickets').doc(_uid).get();
+      if (!ticketSnap.exists) {
+        ticketData['createdAt'] = FieldValue.serverTimestamp();
+        ticketData['subject'] = 'Support Inquiry';
+        ticketData['message'] = text;
+      }
+
+      // Also write ticket header for admin/agents to see
+      await _firestore.collection('support_tickets').doc(_uid).set(ticketData, SetOptions(merge: true));
+
+      await UserBehaviorService.logSupportTicket(text);
 
       _msgController.clear();
       _scrollToBottom();

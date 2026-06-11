@@ -389,13 +389,16 @@ class _TicketDetailSheetState extends State<_TicketDetailSheet> {
       await FirebaseFirestore.instance
           .collection('support_tickets')
           .doc(widget.ticketId)
-          .collection('replies')
+          .collection('messages')
           .add({
+        'text': text,
         'message': text,
         'senderId': agentId,
         'senderName': 'AGENT Support',
+        'senderType': 'agent',
         'isAgent': true,
         'createdAt': FieldValue.serverTimestamp(),
+        'isRead': false,
       });
       await FirebaseFirestore.instance
           .collection('support_tickets')
@@ -403,6 +406,8 @@ class _TicketDetailSheetState extends State<_TicketDetailSheet> {
           .update({
         'status': 'in_progress',
         'lastReply': text,
+        'lastMessage': text,
+        'updatedAt': FieldValue.serverTimestamp(),
         'lastReplyAt': FieldValue.serverTimestamp(),
       });
       _replyController.clear();
@@ -508,7 +513,7 @@ class _TicketDetailSheetState extends State<_TicketDetailSheet> {
                     stream: FirebaseFirestore.instance
                         .collection('support_tickets')
                         .doc(widget.ticketId)
-                        .collection('replies')
+                        .collection('messages')
                         .orderBy('createdAt', descending: false)
                         .snapshots(),
                     builder: (context, snap) {
@@ -520,7 +525,8 @@ class _TicketDetailSheetState extends State<_TicketDetailSheet> {
                       return Column(
                         children: replies.map((r) {
                           final rd = r.data();
-                          final isAgent = rd['isAgent'] == true;
+                          final isAgent = rd['isAgent'] == true || rd['senderType'] == 'admin' || rd['senderType'] == 'agent';
+                          final messageText = rd['message'] ?? rd['text'] ?? '';
                           return Align(
                             alignment: isAgent
                                 ? Alignment.centerRight
@@ -537,7 +543,7 @@ class _TicketDetailSheetState extends State<_TicketDetailSheet> {
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Text(
-                                rd['message'] ?? '',
+                                messageText.toString(),
                                 style: TextStyle(
                                   color: isAgent ? Colors.white : Colors.black87,
                                   fontSize: 13,

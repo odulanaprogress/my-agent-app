@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../properties/models/property_model.dart';
 import '../providers/search_provider.dart';
+import '../../../../core/services/user_behavior_service.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -129,6 +130,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     onSubmitted: (v) async {
                       searchNotifier.setQueryText(v.toLowerCase());
                       await searchNotifier.refresh();
+                      if (v.trim().isNotEmpty) {
+                        await UserBehaviorService.logSearch(v.trim());
+                      }
                     },
                   ),
                   const SizedBox(height: 16),

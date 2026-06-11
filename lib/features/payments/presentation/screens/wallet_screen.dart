@@ -210,7 +210,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     escrowBalance: 0,
                     userName: currentUser?.fullName ?? '',
                   ),
-                  error: (_, __) => WalletBalanceCard(
+                  error: (_, err) => WalletBalanceCard(
                     balance: 0,
                     userName: currentUser?.fullName ?? '',
                   ),
@@ -271,7 +271,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                           isLoading: false,
                           onTap: () => _showWithdrawSheet(0),
                         ),
-                        error: (_, __) => _actionBtn(
+                        error: (_, err) => _actionBtn(
                           label: 'Withdraw',
                           icon: Icons.arrow_upward_rounded,
                           color: const Color(0xFF6366F1),

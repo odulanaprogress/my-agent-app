@@ -9,6 +9,7 @@ import '../../domain/verification_type.dart';
 import '../../domain/verification_status.dart';
 import '../../../../../core/services/cloudinary_service.dart';
 import '../../../../auth/presentation/providers/current_user_provider.dart';
+import '../../../../../core/services/user_behavior_service.dart';
 
 class UploadVerificationScreen extends ConsumerStatefulWidget {
   const UploadVerificationScreen({super.key});
@@ -204,6 +205,9 @@ class _UploadVerificationScreenState
             utilityBill: utilityUrl,
             role: user.role,
           );
+
+      // Log verification submission behavior
+      await UserBehaviorService.logVerificationSubmit();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/user_behavior_service.dart';
 
 class PaymentMethodScreen extends StatefulWidget {
   const PaymentMethodScreen({super.key});
@@ -15,6 +16,12 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
 
   void _simulatePaystackCheckout() {
     if (_selectedPayment == null) return;
+
+    UserBehaviorService.log(
+      action: 'payment_initiated',
+      description: 'Initiated Paystack payment via $_selectedPayment',
+      metadata: {'payment_channel': _selectedPayment},
+    );
 
     setState(() {
       _isProcessing = true;
@@ -47,6 +54,11 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
 
           Future.delayed(const Duration(seconds: 1), () {
             if (!mounted) return;
+            UserBehaviorService.log(
+              action: 'payment_success',
+              description: 'Completed Paystack payment via $_selectedPayment',
+              metadata: {'payment_channel': _selectedPayment},
+            );
             setState(() {
               _isProcessing = false;
             });

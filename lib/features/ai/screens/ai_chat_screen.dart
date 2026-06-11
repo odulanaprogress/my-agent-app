@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/ai_service.dart';
+import '../../../core/services/user_behavior_service.dart';
 
 class AIChatScreen extends ConsumerStatefulWidget {
   const AIChatScreen({super.key});
@@ -243,17 +244,35 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                         .get();
                     final userData = userDoc.data();
 
-                    await FirebaseFirestore.instance
+                    final ticketRef = FirebaseFirestore.instance
                         .collection('support_tickets')
-                        .add({
+                        .doc(user.uid);
+
+                    await ticketRef.set({
                       'userId': user.uid,
+                      'uid': user.uid,
                       'userName': userData?['fullName'] ?? 'Unknown',
                       'userEmail': user.email ?? '',
                       'subject': subject,
                       'message': message,
+                      'lastMessage': message,
                       'status': 'open',
                       'createdAt': FieldValue.serverTimestamp(),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
+
+                    await ticketRef.collection('messages').add({
+                      'text': '$subject: $message',
+                      'message': '$subject: $message',
+                      'senderId': user.uid,
+                      'senderType': 'user',
+                      'isAgent': false,
+                      'createdAt': FieldValue.serverTimestamp(),
+                      'isRead': false,
                     });
+
+                    // Log support ticket behavior
+                    await UserBehaviorService.logSupportTicket(subject);
 
                     if (ctx.mounted) Navigator.pop(ctx);
 
