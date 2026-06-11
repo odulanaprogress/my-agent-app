@@ -1,0 +1,69 @@
+name: agent_app
+description: "A new Flutter project."
+
+publish_to: 'none'
+version: 1.0.0+1
+environment:
+  sdk: ^3.11.4
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  http: ^1.2.1
+  # State Management
+  provider: ^6.1.5+1
+  flutter_riverpod: ^2.6.1
+  # Local Storage
+  shared_preferences: ^2.5.5
+  flutter_secure_storage: ^9.2.4
+  # Firebase
+  firebase_core: ^4.7.0
+  firebase_auth: ^6.4.0
+  cloud_firestore: ^6.3.0
+  # Networking
+  dio: ^5.9.0
+  connectivity_plus: ^6.1.5
+  # Utilities
+  url_launcher: ^6.3.2
+  image_picker: ^1.2.2
+  permission_handler: ^11.3.1
+  # Routing
+  go_router: ^16.2.0
+  # Environment
+  flutter_dotenv: ^5.2.1
+  # Media
+  cached_network_image: ^3.4.1
+  cloudinary_public: ^0.23.1
+  # UI
+  google_fonts: ^6.3.2
+  google_sign_in: ^7.2.0
+  # Local auth (biometrics)
+  local_auth: ^2.3.0
+  # Extras
+  intl: ^0.17.0
+
+  # AI support (STEP 29)
+
+
+  uuid: ^4.5.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.4.6
+flutter_native_splash:
+  color: "#0F172A"
+  image: assets/logos/agent_logo.png
+  android_12:
+    color: "#0F172A"
+    image: assets/logos/agent_logo.png
+  web: false
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/
+    - assets/icons/
+    - assets/logos/
+    - assets/images/onboarding/

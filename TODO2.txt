@@ -1,0 +1,10 @@
+# TODO2 - Landlord dashboard continuation
+
+- [ ] Fix compilation issues in lib/features/dashboard/presentation/screens/landlord_dashboard_screen.dart
+- [ ] Remove duplicate/unused imports in landlord_dashboard_screen.dart
+- [ ] Replace FutureBuilder with StreamBuilder using PropertyService().getProperties()
+- [ ] Filter properties locally by user.uid as ownerId and apply search query filter
+- [ ] Replace legacy_property_card.PropertyCard usage with lib/core/widgets/property_card.dart
+- [ ] Fix Add Property navigation route to match GoRouter routes
+- [ ] Run flutter analyze and widget tests
+

@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "properties",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "isApproved", "order": "ASC"},
+        {"fieldPath": "createdAt", "order": "DESC"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
+

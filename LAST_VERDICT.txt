@@ -1,0 +1,15 @@
+Verdict: Not all Phase 2 tasks (STEP 1–10 + auth flow) were implemented yet.
+
+Implemented in this chat:
+- Onboarding foundation (model/data + screens)
+- Routing for Splash -> /privacy -> /onboarding
+- Dashboard placeholder route + screen
+- App skeleton files under lib/app (app.dart, app_theme/colors/text_styles, routes)
+
+Not implemented yet:
+- StorageKeys + SharedPrefsService persistence
+- App startup provider
+- env_config/main.dart refactor
+- Auth screens (role_selection/login/signup) + their routes
+- Persistence-aware splash branching + dashboard routing
+

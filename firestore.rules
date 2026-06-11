@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ------------------------------
+    // Helpers
+    // ------------------------------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Role-based access: reads `users/{uid}.role` from Firestore.
+    function isAdmin() {
+      return signedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // ------------------------------
+    // Users
+    // ------------------------------
+    match /users/{uid} {
+      // Users can read/write their own profile; admins can read any profile
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // ------------------------------
+    // Properties
+    // ------------------------------
+    match /properties/{propertyId} {
+      // Anyone signed-in can read approved properties (tenant marketplace).
+      // Owners can always read their own (even if pending/rejected).
+      // Admins can read all.
+      allow read: if signedIn() && (
+        resource.data.isApproved == true ||
+        resource.data.ownerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Landlords can create their own listing
+      allow create: if signedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      // Owners can update/delete their own listing; admins can update for approval
+      allow update: if signedIn() && (
+        resource.data.ownerId == request.auth.uid || isAdmin()
+      );
+      allow delete: if signedIn() && (
+        resource.data.ownerId == request.auth.uid || isAdmin()
+      );
+    }
+
+    // ------------------------------
+    // Favorites (subcollection under users)
+    // ------------------------------
+    match /users/{uid}/favorites/{propertyId} {
+      allow read, create, delete: if isOwner(uid);
+    }
+
+    // ------------------------------
+    // Conversations + Messages
+    // ------------------------------
+    match /conversations/{conversationId} {
+      // Only participants can read/update; anyone signed-in can create
+      allow read: if signedIn() && (
+        resource == null ||
+        request.auth.uid in resource.data.participants
+      );
+      allow create: if signedIn();
+      allow update, delete: if signedIn() &&
+        request.auth.uid in resource.data.participants;
+
+      match /messages/{messageId} {
+        allow read, create, update, delete: if signedIn() &&
+          request.auth.uid in
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+      }
+    }
+
+    // ------------------------------
+    // Transactions
+    // ------------------------------
+    match /transactions/{transactionId} {
+      allow read: if signedIn() && (
+        request.auth.uid == resource.data.tenantId ||
+        request.auth.uid == resource.data.landlordId ||
+        isAdmin()
+      );
+      allow create: if signedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // ------------------------------
+    // Notifications
+    // ------------------------------
+    match /notifications/{notificationId} {
+      allow read: if signedIn() &&
+        request.auth.uid == resource.data.userId;
+      allow create: if signedIn();
+      allow update, delete: if signedIn() &&
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    // ------------------------------
+    // Verification documents (KYC)
+    // ------------------------------
+    match /verifications/{verificationId} {
+      allow read: if signedIn() && (
+        request.auth.uid == resource.data.userId || isAdmin()
+      );
+      allow create: if signedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if signedIn() && (
+        request.auth.uid == resource.data.userId || isAdmin()
+      );
+      allow delete: if signedIn() && (
+        request.auth.uid == resource.data.userId || isAdmin()
+      );
+    }
+
+    // ------------------------------
+    // Support Tickets
+    // ------------------------------
+    match /support_tickets/{uid} {
+      // Users can read/write their own ticket header; admins can read all
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        // Ticket owner and admins can read/write messages
+        allow read, create: if isOwner(uid) || isAdmin();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // ------------------------------
+    // Default deny everything else
+    // ------------------------------
+    match /{documentPath=**} {
+      allow read, write: if false;
+    }
+  }
+}
