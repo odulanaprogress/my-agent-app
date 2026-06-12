@@ -1,4 +1,4 @@
-enum VerificationStatus { pending, approved, rejected, expired }
+enum VerificationStatus { none, pending, approved, rejected, expired }
 
 extension VerificationStatusX on VerificationStatus {
   String get asFirestoreValue => name;
@@ -6,7 +6,7 @@ extension VerificationStatusX on VerificationStatus {
   static VerificationStatus fromFirestore(String value) {
     return VerificationStatus.values.firstWhere(
       (e) => e.name == value,
-      orElse: () => VerificationStatus.pending,
+      orElse: () => VerificationStatus.none,
     );
   }
 }

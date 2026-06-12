@@ -22,8 +22,9 @@ service cloud.firestore {
     // Users
     // ------------------------------
     match /users/{uid} {
-      // Users can read/write their own profile; admins can read any profile
-      allow read: if isOwner(uid) || isAdmin();
+      // Users can read any profile if signed in (needed for landlord/tenant chat and profiles)
+      // but write is restricted to owner or admin.
+      allow read: if signedIn();
       allow create: if isOwner(uid);
       allow update: if isOwner(uid) || isAdmin();
       allow delete: if isOwner(uid) || isAdmin();
@@ -111,15 +112,16 @@ service cloud.firestore {
     // ------------------------------
     match /verifications/{verificationId} {
       allow read: if signedIn() && (
-        request.auth.uid == resource.data.userId || isAdmin()
+        verificationId == request.auth.uid || isAdmin()
       );
       allow create: if signedIn() &&
-        request.resource.data.userId == request.auth.uid;
+        verificationId == request.auth.uid &&
+        request.resource.data.uid == request.auth.uid;
       allow update: if signedIn() && (
-        request.auth.uid == resource.data.userId || isAdmin()
+        verificationId == request.auth.uid || isAdmin()
       );
       allow delete: if signedIn() && (
-        request.auth.uid == resource.data.userId || isAdmin()
+        verificationId == request.auth.uid || isAdmin()
       );
     }
 
@@ -137,6 +139,14 @@ service cloud.firestore {
         allow read, create: if isOwner(uid) || isAdmin();
         allow update, delete: if isAdmin();
       }
+    }
+
+    // ------------------------------
+    // User Behavior Logs
+    // ------------------------------
+    match /user_behavior_logs/{logId} {
+      allow create: if signedIn();
+      allow read, update, delete: if isAdmin();
     }
 
     // ------------------------------

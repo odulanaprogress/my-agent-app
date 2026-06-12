@@ -33,6 +33,13 @@ class _UploadVerificationScreenState
   File? _propertyOwnershipFile;
   File? _utilityBillFile;
 
+  // Remote URLs for resubmission
+  String? _remoteFrontUrl;
+  String? _remoteBackUrl;
+  String? _remoteSelfieUrl;
+  String? _remoteOwnershipUrl;
+  String? _remoteUtilityUrl;
+
   bool _isUploading = false;
   String _uploadProgressMessage = '';
 
@@ -46,7 +53,42 @@ class _UploadVerificationScreenState
       _fullNameController.text = user.fullName;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(verificationStateProvider);
+      if (state.documentData != null) {
+        _populateFields(state.documentData!);
+      }
       ref.read(verificationControllerProvider).refresh();
+    });
+  }
+
+  void _populateFields(Map<String, dynamic> doc) {
+    setState(() {
+      final user = ref.read(currentUserProvider);
+      if (_fullNameController.text.isEmpty || (user != null && _fullNameController.text == user.fullName)) {
+        final docName = doc['fullName'] as String?;
+        if (docName != null && docName.isNotEmpty) {
+          _fullNameController.text = docName;
+        }
+      }
+      if (_documentNumberController.text.isEmpty) {
+        final docNum = doc['documentNumber'] as String?;
+        if (docNum != null && docNum.isNotEmpty) {
+          _documentNumberController.text = docNum;
+        }
+      }
+      final typeStr = doc['verificationType'] as String?;
+      if (typeStr != null) {
+        final matchedType = VerificationType.values.firstWhere(
+          (e) => e.asFirestoreValue == typeStr,
+          orElse: () => VerificationType.nin,
+        );
+        _selectedType = matchedType;
+      }
+      _remoteFrontUrl = doc['documentFront'] as String?;
+      _remoteBackUrl = doc['documentBack'] as String?;
+      _remoteSelfieUrl = doc['selfieImage'] as String?;
+      _remoteOwnershipUrl = doc['propertyOwnershipDoc'] as String?;
+      _remoteUtilityUrl = doc['utilityBill'] as String?;
     });
   }
 
@@ -96,18 +138,23 @@ class _UploadVerificationScreenState
           switch (type) {
             case 'front':
               _idFrontFile = file;
+              _remoteFrontUrl = null;
               break;
             case 'back':
               _idBackFile = file;
+              _remoteBackUrl = null;
               break;
             case 'selfie':
               _selfieFile = file;
+              _remoteSelfieUrl = null;
               break;
             case 'ownership':
               _propertyOwnershipFile = file;
+              _remoteOwnershipUrl = null;
               break;
             case 'utility':
               _utilityBillFile = file;
+              _remoteUtilityUrl = null;
               break;
           }
         });
@@ -128,26 +175,33 @@ class _UploadVerificationScreenState
 
     final isLandlord = user.role == 'landlord';
 
-    // Validation
-    if (_idFrontFile == null) {
+    // Validation using either selected local files or existing remote URLs
+    final hasFront = _idFrontFile != null || (_remoteFrontUrl != null && _remoteFrontUrl!.isNotEmpty);
+    if (!hasFront) {
       _showError('Please select ID Document Front photo');
       return;
     }
     // Passports typically don't have a back page that needs uploading, but other cards do
-    if (_selectedType != VerificationType.internationalPassport && _idBackFile == null) {
-      _showError('Please select ID Document Back photo');
-      return;
+    if (_selectedType != VerificationType.internationalPassport) {
+      final hasBack = _idBackFile != null || (_remoteBackUrl != null && _remoteBackUrl!.isNotEmpty);
+      if (!hasBack) {
+        _showError('Please select ID Document Back photo');
+        return;
+      }
     }
-    if (_selfieFile == null) {
+    final hasSelfie = _selfieFile != null || (_remoteSelfieUrl != null && _remoteSelfieUrl!.isNotEmpty);
+    if (!hasSelfie) {
       _showError('Please take a selfie photo');
       return;
     }
     if (isLandlord) {
-      if (_propertyOwnershipFile == null) {
+      final hasOwnership = _propertyOwnershipFile != null || (_remoteOwnershipUrl != null && _remoteOwnershipUrl!.isNotEmpty);
+      if (!hasOwnership) {
         _showError('Landlords must provide Property Ownership Document');
         return;
       }
-      if (_utilityBillFile == null) {
+      final hasUtility = _utilityBillFile != null || (_remoteUtilityUrl != null && _remoteUtilityUrl!.isNotEmpty);
+      if (!hasUtility) {
         _showError('Landlords must provide Utility Bill (Proof of Address)');
         return;
       }
@@ -161,11 +215,15 @@ class _UploadVerificationScreenState
     try {
       final cloudinary = CloudinaryService();
 
-      setState(() => _uploadProgressMessage = 'Uploading ID Front...');
-      final frontUrl = await cloudinary.uploadImage(_idFrontFile!);
-      if (frontUrl == null) throw Exception('Failed to upload ID Front image');
+      String frontUrl = _remoteFrontUrl ?? '';
+      if (_idFrontFile != null) {
+        setState(() => _uploadProgressMessage = 'Uploading ID Front...');
+        final res = await cloudinary.uploadImage(_idFrontFile!);
+        if (res == null) throw Exception('Failed to upload ID Front image');
+        frontUrl = res;
+      }
 
-      String backUrl = '';
+      String backUrl = _remoteBackUrl ?? '';
       if (_idBackFile != null) {
         setState(() => _uploadProgressMessage = 'Uploading ID Back...');
         final res = await cloudinary.uploadImage(_idBackFile!);
@@ -173,23 +231,31 @@ class _UploadVerificationScreenState
         backUrl = res;
       }
 
-      setState(() => _uploadProgressMessage = 'Uploading Selfie...');
-      final selfieUrl = await cloudinary.uploadImage(_selfieFile!);
-      if (selfieUrl == null) throw Exception('Failed to upload Selfie');
+      String selfieUrl = _remoteSelfieUrl ?? '';
+      if (_selfieFile != null) {
+        setState(() => _uploadProgressMessage = 'Uploading Selfie...');
+        final res = await cloudinary.uploadImage(_selfieFile!);
+        if (res == null) throw Exception('Failed to upload Selfie');
+        selfieUrl = res;
+      }
 
-      String ownershipUrl = '';
-      String utilityUrl = '';
+      String ownershipUrl = _remoteOwnershipUrl ?? '';
+      String utilityUrl = _remoteUtilityUrl ?? '';
 
       if (isLandlord) {
-        setState(() => _uploadProgressMessage = 'Uploading Ownership Document...');
-        final resOwner = await cloudinary.uploadImage(_propertyOwnershipFile!);
-        if (resOwner == null) throw Exception('Failed to upload Ownership Document');
-        ownershipUrl = resOwner;
+        if (_propertyOwnershipFile != null) {
+          setState(() => _uploadProgressMessage = 'Uploading Ownership Document...');
+          final resOwner = await cloudinary.uploadImage(_propertyOwnershipFile!);
+          if (resOwner == null) throw Exception('Failed to upload Ownership Document');
+          ownershipUrl = resOwner;
+        }
 
-        setState(() => _uploadProgressMessage = 'Uploading Utility Bill...');
-        final resUtil = await cloudinary.uploadImage(_utilityBillFile!);
-        if (resUtil == null) throw Exception('Failed to upload Utility Bill');
-        utilityUrl = resUtil;
+        if (_utilityBillFile != null) {
+          setState(() => _uploadProgressMessage = 'Uploading Utility Bill...');
+          final resUtil = await cloudinary.uploadImage(_utilityBillFile!);
+          if (resUtil == null) throw Exception('Failed to upload Utility Bill');
+          utilityUrl = resUtil;
+        }
       }
 
       setState(() => _uploadProgressMessage = 'Saving verification details...');
@@ -246,6 +312,12 @@ class _UploadVerificationScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<VerificationState>(verificationStateProvider, (previous, next) {
+      if (next.documentData != null && (previous == null || previous.documentData == null)) {
+        _populateFields(next.documentData!);
+      }
+    });
+
     final user = ref.watch(currentUserProvider);
     final isLandlord = user?.role == 'landlord';
     final state = ref.watch(verificationStateProvider);
@@ -332,6 +404,57 @@ class _UploadVerificationScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Display Rejection Feedback at the top if verification was rejected
+                    if (state.status == VerificationStatus.rejected && state.rejectionReason != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          border: Border.all(color: const Color(0xFFFCA5A5), width: 1.5),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Verification Rejected',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF991B1B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              state.rejectionReason!,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF7F1D1D),
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Please correct the highlighted fields/documents and resubmit.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF991B1B),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
                     // Header Info Card
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -492,8 +615,14 @@ class _UploadVerificationScreenState
                       title: 'ID Front Side Photo',
                       subtitle: 'Ensure all details are clearly readable',
                       file: _idFrontFile,
+                      imageUrl: _remoteFrontUrl,
                       onTap: () => _pickImage('front'),
-                      onClear: () => setState(() => _idFrontFile = null),
+                      onClear: () {
+                        setState(() {
+                          _idFrontFile = null;
+                          _remoteFrontUrl = null;
+                        });
+                      },
                     ),
                     const SizedBox(height: 14),
 
@@ -502,8 +631,14 @@ class _UploadVerificationScreenState
                         title: 'ID Back Side Photo',
                         subtitle: 'Upload the rear side of your ID card',
                         file: _idBackFile,
+                        imageUrl: _remoteBackUrl,
                         onTap: () => _pickImage('back'),
-                        onClear: () => setState(() => _idBackFile = null),
+                        onClear: () {
+                          setState(() {
+                            _idBackFile = null;
+                            _remoteBackUrl = null;
+                          });
+                        },
                       ),
                       const SizedBox(height: 14),
                     ],
@@ -512,8 +647,14 @@ class _UploadVerificationScreenState
                       title: 'Selfie Photo',
                       subtitle: 'Hold a clear neutral pose in good lighting',
                       file: _selfieFile,
+                      imageUrl: _remoteSelfieUrl,
                       onTap: () => _pickImage('selfie'),
-                      onClear: () => setState(() => _selfieFile = null),
+                      onClear: () {
+                        setState(() {
+                          _selfieFile = null;
+                          _remoteSelfieUrl = null;
+                        });
+                      },
                       isSelfie: true,
                     ),
                     const SizedBox(height: 24),
@@ -532,16 +673,28 @@ class _UploadVerificationScreenState
                         title: 'Property Ownership Document',
                         subtitle: 'Upload C of O, Deed of Assignment, or Governor\'s Consent',
                         file: _propertyOwnershipFile,
+                        imageUrl: _remoteOwnershipUrl,
                         onTap: () => _pickImage('ownership'),
-                        onClear: () => setState(() => _propertyOwnershipFile = null),
+                        onClear: () {
+                          setState(() {
+                            _propertyOwnershipFile = null;
+                            _remoteOwnershipUrl = null;
+                          });
+                        },
                       ),
                       const SizedBox(height: 14),
                       _buildImageUploadCard(
                         title: 'Utility Bill / Proof of Address',
                         subtitle: 'Power or water bill from past 3 months',
                         file: _utilityBillFile,
+                        imageUrl: _remoteUtilityUrl,
                         onTap: () => _pickImage('utility'),
-                        onClear: () => setState(() => _utilityBillFile = null),
+                        onClear: () {
+                          setState(() {
+                            _utilityBillFile = null;
+                            _remoteUtilityUrl = null;
+                          });
+                        },
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -617,16 +770,18 @@ class _UploadVerificationScreenState
     required String title,
     required String subtitle,
     required File? file,
+    required String? imageUrl,
     required VoidCallback onTap,
     required VoidCallback onClear,
     bool isSelfie = false,
   }) {
+    final hasImage = file != null || (imageUrl != null && imageUrl.isNotEmpty);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: file != null ? Colors.green.shade200 : Colors.grey.shade200,
+          color: hasImage ? Colors.green.shade200 : Colors.grey.shade200,
           width: 1.5,
         ),
       ),
@@ -651,9 +806,14 @@ class _UploadVerificationScreenState
                               image: FileImage(file),
                               fit: BoxFit.cover,
                             )
-                          : null,
+                          : (imageUrl != null && imageUrl.isNotEmpty)
+                              ? DecorationImage(
+                                  image: NetworkImage(imageUrl),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
                     ),
-                    child: file == null
+                    child: !hasImage
                         ? Icon(
                             isSelfie ? Icons.face_rounded : Icons.photo_library_outlined,
                             color: const Color(0xFF64748B),
@@ -685,7 +845,7 @@ class _UploadVerificationScreenState
                       ],
                     ),
                   ),
-                  if (file != null)
+                  if (hasImage)
                     IconButton(
                       icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent),
                       onPressed: onClear,

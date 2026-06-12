@@ -11,7 +11,8 @@ import '../../../../features/support/support_inquiry_screen.dart';
 import '../../../../core/services/permission_service.dart';
 import '../../../../core/services/user_behavior_service.dart';
 import '../../../../features/ai/screens/ai_chat_screen.dart';
-
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TenantDashboardScreen extends ConsumerStatefulWidget {
   const TenantDashboardScreen({super.key});
@@ -27,13 +28,160 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
   String searchQuery = '';
   String? selectedCategory;
 
+  TutorialCoachMark? tutorialCoachMark;
+  final GlobalKey _aiChatKey = GlobalKey();
+  final GlobalKey _supportKey = GlobalKey();
+  final GlobalKey _searchKey = GlobalKey();
+  final GlobalKey _quickActionsKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PermissionService.requestLocationPermission(context);
       UserBehaviorService.logLogin();
+      _checkAndShowTour();
     });
+  }
+
+  Future<void> _checkAndShowTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenTour = prefs.getBool('has_seen_tour_tenant') ?? false;
+    
+    if (!hasSeenTour && mounted) {
+      _showTour();
+      await prefs.setBool('has_seen_tour_tenant', true);
+    }
+  }
+
+  void _showTour() {
+    tutorialCoachMark = TutorialCoachMark(
+      targets: _createTargets(),
+      colorShadow: const Color(0xFF0F172A),
+      textSkip: "SKIP",
+      paddingFocus: 10,
+      opacityShadow: 0.8,
+      onFinish: () {},
+      onClickTarget: (target) {},
+      onClickTargetWithTapPosition: (target, tapDetails) {},
+      onClickOverlay: (target) {},
+      onSkip: () => true,
+    )..show(context: context);
+  }
+
+  List<TargetFocus> _createTargets() {
+    return [
+      TargetFocus(
+        identify: "searchKey",
+        keyTarget: _searchKey,
+        alignSkip: Alignment.topRight,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) {
+              return const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Search Properties",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Find your dream home by searching through our premium listings.",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "quickActionsKey",
+        keyTarget: _quickActionsKey,
+        alignSkip: Alignment.topRight,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) {
+              return const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Quick Actions",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Access your wallet, rentals, verification, and saved properties quickly.",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "aiChatKey",
+        keyTarget: _aiChatKey,
+        shape: ShapeLightFocus.Circle,
+        alignSkip: Alignment.topLeft,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) {
+              return const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "AI Assistant",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Need help finding a property? Chat with our smart AI assistant anytime.",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "supportKey",
+        keyTarget: _supportKey,
+        shape: ShapeLightFocus.RRect,
+        alignSkip: Alignment.topLeft,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) {
+              return const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Customer Support",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Have an issue? Open a ticket or chat with our live support agents.",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    ];
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -74,6 +222,7 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           FloatingActionButton.small(
+            key: _aiChatKey,
             heroTag: 'ai_chat',
             onPressed: () => Navigator.push(
               context,
@@ -85,6 +234,7 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
           ),
           const SizedBox(height: 10),
           FloatingActionButton.extended(
+            key: _supportKey,
             heroTag: 'support',
             onPressed: () => Navigator.push(
               context,
@@ -139,6 +289,7 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
 
                 // Search field with compact premium container styling
                 Container(
+                  key: _searchKey,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   height: 50,
                   decoration: BoxDecoration(
@@ -282,18 +433,26 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
                 const SizedBox(height: 8),
 
                 // ── Quick Actions Grid ─────────────────────────────
-                const Padding(
-                  padding: EdgeInsets.only(left: 2, bottom: 10),
-                  child: Text(
-                    'Quick Actions',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                    ),
+                Container(
+                  key: _quickActionsKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(left: 2, bottom: 10),
+                        child: Text(
+                          'Quick Actions',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                      _buildQuickActions(),
+                    ],
                   ),
                 ),
-                _buildQuickActions(),
                 const SizedBox(height: 14),
 
                 const Padding(

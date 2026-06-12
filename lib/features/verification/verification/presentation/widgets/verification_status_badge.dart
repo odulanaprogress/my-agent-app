@@ -10,6 +10,10 @@ class VerificationStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bg, fg) = switch (status) {
+      VerificationStatus.none => (
+        Colors.blue.withValues(alpha: 0.12),
+        Colors.blue,
+      ),
       VerificationStatus.pending => (
         Colors.orange.withValues(alpha: 0.12),
         Colors.orange,

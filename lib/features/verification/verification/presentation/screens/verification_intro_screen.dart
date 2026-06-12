@@ -1,11 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class VerificationIntroScreen extends StatelessWidget {
+import '../../providers/verification_provider.dart';
+import '../../domain/verification_status.dart';
+
+class VerificationIntroScreen extends ConsumerStatefulWidget {
   const VerificationIntroScreen({super.key});
 
   @override
+  ConsumerState<VerificationIntroScreen> createState() => _VerificationIntroScreenState();
+}
+
+class _VerificationIntroScreenState extends ConsumerState<VerificationIntroScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(verificationControllerProvider).refresh();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = ref.watch(verificationStateProvider);
+
+    // If verification has already been submitted and is not "none", redirect to status
+    if (state.status != VerificationStatus.none) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.go('/verification/status');
+        }
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(

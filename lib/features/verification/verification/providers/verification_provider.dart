@@ -11,27 +11,37 @@ class VerificationState {
   final bool loading;
   final VerificationStatus status;
   final String? error;
+  final String? rejectionReason;
+  final Map<String, dynamic>? documentData;
 
   const VerificationState({
     required this.loading,
     required this.status,
     this.error,
+    this.rejectionReason,
+    this.documentData,
   });
 
   factory VerificationState.initial() => const VerificationState(
     loading: false,
-    status: VerificationStatus.pending,
+    status: VerificationStatus.none,
+    rejectionReason: null,
+    documentData: null,
   );
 
   VerificationState copyWith({
     bool? loading,
     VerificationStatus? status,
     String? error,
+    String? rejectionReason,
+    Map<String, dynamic>? documentData,
   }) {
     return VerificationState(
       loading: loading ?? this.loading,
       status: status ?? this.status,
       error: error,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      documentData: documentData ?? this.documentData,
     );
   }
 }
@@ -46,10 +56,21 @@ class VerificationController {
     final user = ref.read(currentUserProvider);
     if (user == null) return;
 
-    final st = await repository.getStatus(user.uid);
+    final doc = await repository.getVerificationDoc(user.uid);
+    if (doc == null) {
+      ref.read(_verificationStateProvider.notifier).state = ref
+          .read(_verificationStateProvider)
+          .copyWith(status: VerificationStatus.none, rejectionReason: null, documentData: null);
+      return;
+    }
+
+    final statusValue = (doc['status'] ?? 'none').toString();
+    final st = VerificationStatusX.fromFirestore(statusValue);
+    final reason = doc['rejectionReason'] as String?;
+
     ref.read(_verificationStateProvider.notifier).state = ref
         .read(_verificationStateProvider)
-        .copyWith(status: st);
+        .copyWith(status: st, rejectionReason: reason, documentData: doc);
   }
 
   Future<void> submitVerification({

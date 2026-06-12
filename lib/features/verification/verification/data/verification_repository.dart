@@ -65,9 +65,9 @@ class VerificationRepository {
 
   Future<VerificationStatus> getStatus(String uid) async {
     final snap = await docFor(uid).get();
-    if (!snap.exists) return VerificationStatus.pending;
+    if (!snap.exists) return VerificationStatus.none;
     final data = snap.data()!;
-    final statusValue = (data['status'] ?? 'pending').toString();
+    final statusValue = (data['status'] ?? 'none').toString();
     return VerificationStatusX.fromFirestore(statusValue);
   }
 

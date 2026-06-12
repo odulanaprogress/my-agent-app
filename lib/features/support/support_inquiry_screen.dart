@@ -218,7 +218,7 @@ class _SupportInquiryScreenState extends State<SupportInquiryScreen> {
                         itemBuilder: (context, index) {
                           final data = docs[index].data();
                           final isMe = data['senderType'] == 'user';
-                          final text = (data['text'] ?? '').toString();
+                          final text = (data['text'] ?? data['message'] ?? '').toString();
                           final ts = data['createdAt'] as Timestamp?;
                           final time = ts != null
                               ? _formatTime(ts.toDate())
