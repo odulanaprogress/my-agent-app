@@ -46,8 +46,15 @@ class _LandlordDashboardScreenState
   Future<void> _checkJustRegistered() async {
     final prefs = await SharedPreferences.getInstance();
     final justRegistered = prefs.getBool('just_registered') ?? false;
+    // Also check if this is the first login on this device (fingerprint not yet set)
+    final justLoggedIn = prefs.getBool('just_logged_in') ?? false;
     if (justRegistered) {
       await prefs.setBool('just_registered', false);
+      if (mounted) {
+        await showBiometricRegistrationPromptIfNeeded(context);
+      }
+    } else if (justLoggedIn) {
+      await prefs.setBool('just_logged_in', false);
       if (mounted) {
         await showBiometricRegistrationPromptIfNeeded(context);
       }
@@ -256,83 +263,121 @@ class _LandlordDashboardScreenState
                 ),
                 const SizedBox(height: 20),
 
-                // Financial metrics
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(26),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF1E3A8A).withValues(alpha: 0.15),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'ESTIMATED MONTHLY EARNINGS',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.1,
-                            ),
-                          ),
-                          const Icon(Icons.trending_up_rounded,
-                              color: Colors.green, size: 20),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '₦0.00',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                // Financial metrics (REAL-TIME stream)
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: () {
+                    final uid = FirebaseAuth.instance.currentUser?.uid;
+                    if (uid == null) {
+                      return Stream<QuerySnapshot<Map<String, dynamic>>>.empty();
+                    }
+                    return FirebaseFirestore.instance
+                        .collection('transactions')
+                        .where('landlordId', isEqualTo: uid)
+                        .snapshots();
+                  }(),
+                  builder: (context, txSnap) {
+                    final docs = txSnap.data?.docs ?? [];
+                    // Compute totals
+                    double totalEarnings = 0;
+                    int onTime = 0;
+                    int late = 0;
+                    for (final doc in docs) {
+                      final data = doc.data();
+                      final status = (data['status'] ?? '').toString();
+                      final amount = (data['amount'] ?? 0);
+                      final amountNum = amount is num ? amount.toDouble() : double.tryParse(amount.toString()) ?? 0.0;
+                      if (status == 'released' || status == 'completed') {
+                        totalEarnings += amountNum;
+                        onTime++;
+                      } else if (status == 'disputed' || status == 'overdue') {
+                        late++;
+                      }
+                    }
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      ),
-                      const SizedBox(height: 18),
-                      Container(
-                          height: 1,
-                          color: Colors.white.withValues(alpha: 0.1)),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildFinancialDetail(
-                              label: 'On-Time Payments',
-                              value: '0',
-                              color: const Color(0xFF10B981),
-                            ),
-                          ),
-                          Container(
-                            width: 1,
-                            height: 30,
-                            color: Colors.white.withValues(alpha: 0.1),
-                          ),
-                          Expanded(
-                            child: _buildFinancialDetail(
-                              label: 'Late Payments',
-                              value: '0',
-                              color: Colors.redAccent,
-                            ),
+                        borderRadius: BorderRadius.circular(26),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF1E3A8A).withValues(alpha: 0.15),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'TOTAL EARNINGS',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                              txSnap.connectionState == ConnectionState.waiting
+                                  ? const SizedBox(
+                                      width: 16, height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white54,
+                                      ))
+                                  : const Icon(Icons.trending_up_rounded,
+                                      color: Colors.green, size: 20),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '₦${_formatCurrency(totalEarnings)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Container(
+                              height: 1,
+                              color: Colors.white.withValues(alpha: 0.1)),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildFinancialDetail(
+                                  label: 'Completed Payments',
+                                  value: '$onTime',
+                                  color: const Color(0xFF10B981),
+                                ),
+                              ),
+                              Container(
+                                width: 1,
+                                height: 30,
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
+                              Expanded(
+                                child: _buildFinancialDetail(
+                                  label: 'Late / Disputed',
+                                  value: '$late',
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
 
@@ -901,15 +946,16 @@ class _LandlordDashboardScreenState
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Property Behaviour Analytics Tab (landlord's properties only)
-  // ─────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+  // Property Behaviour Analytics Tab (landlord's properties only) - REAL-TIME
+  // ───────────────────────────────────────────────────────────────────────────
   Widget _buildPropertyBehaviorTab() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const Center(child: Text('Not logged in.'));
 
-    return FutureBuilder<List<PropertyModel>>(
-      future: PropertyService().getLandlordProperties(uid).first,
+    // REAL-TIME: stream landlord's properties then stream behaviour events
+    return StreamBuilder<List<PropertyModel>>(
+      stream: PropertyService().getLandlordProperties(uid),
       builder: (context, propSnap) {
         if (propSnap.connectionState == ConnectionState.waiting) {
           return const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()));
@@ -937,102 +983,111 @@ class _LandlordDashboardScreenState
 
         final propIds = properties.map((p) => p.id).toList();
 
+        // Stream live behaviour events for this landlord's properties
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
-              .collection('user_behavior')
-              .where('propertyId', whereIn: propIds)
+              .collection('user_behavior_logs')
+              .where('metadata.propertyId', whereIn: propIds)
               .orderBy('timestamp', descending: true)
-              .limit(50)
+              .limit(200)
               .snapshots(),
-          builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()));
-            }
-            final docs = snap.data?.docs ?? [];
-            if (docs.isEmpty) {
-              return Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.grey.shade100),
-                ),
-                child: Column(
+          builder: (context, logSnap) {
+            // Also stream the property docs themselves so the stats
+            // row (viewsCount etc.) reflects Firestore counters in real-time
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('properties')
+                  .where(FieldPath.documentId, whereIn: propIds)
+                  .snapshots(),
+              builder: (context, propDocSnap) {
+                if (logSnap.connectionState == ConnectionState.waiting &&
+                    propDocSnap.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()),
+                  );
+                }
+
+                // Build a map propertyId -> live Firestore data
+                final Map<String, Map<String, dynamic>> liveProps = {};
+                for (final doc in propDocSnap.data?.docs ?? []) {
+                  liveProps[doc.id] = doc.data();
+                }
+
+                int parseInt(dynamic v) {
+                  if (v == null) return 0;
+                  if (v is int) return v;
+                  if (v is num) return v.toInt();
+                  return int.tryParse(v.toString()) ?? 0;
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.bar_chart_rounded, size: 48, color: Colors.grey.shade300),
-                    const SizedBox(height: 12),
-                    Text('No activity yet.', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text('Views, saves, and enquiries on your properties will appear here.', style: TextStyle(color: Colors.grey.shade400, fontSize: 12), textAlign: TextAlign.center),
-                  ],
-                ),
-              );
-            }
-
-            // Aggregate by property
-            final Map<String, Map<String, int>> agg = {};
-            for (final doc in docs) {
-              final d = doc.data();
-              final pId = (d['propertyId'] ?? '') as String;
-              final action = (d['action'] ?? 'view') as String;
-              agg.putIfAbsent(pId, () => {});
-              agg[pId]![action] = (agg[pId]![action] ?? 0) + 1;
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'Engagement on your ${properties.length} propert${properties.length == 1 ? "y" : "ies"}',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                  ),
-                ),
-                ...properties.map((p) {
-                  final stats = agg[p.id] ?? {};
-                  final views = stats['view_property'] ?? stats['view'] ?? 0;
-                  final saves = stats['save_property'] ?? stats['save'] ?? 0;
-                  final enquiries = stats['send_enquiry'] ?? stats['enquiry'] ?? 0;
-                  final whatsapp = stats['whatsapp_click'] ?? stats['whatsapp'] ?? 0;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade100),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Live engagement on your ${properties.length} propert${properties.length == 1 ? "y" : "ies"}',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(p.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 2),
-                        Text(p.location, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                        const SizedBox(height: 14),
-                        Row(
+                    ...properties.map((p) {
+                      final live = liveProps[p.id];
+                      final views = live != null ? parseInt(live['viewsCount']) : p.viewsCount;
+                      final saves = live != null ? parseInt(live['favoritesCount']) : p.favoritesCount;
+                      final enquiries = live != null ? parseInt(live['inquiriesCount']) : p.inquiriesCount;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.grey.shade100),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _statChip(Icons.visibility_outlined, '$views', 'Views', const Color(0xFF6366F1)),
-                            const SizedBox(width: 10),
-                            _statChip(Icons.favorite_rounded, '$saves', 'Saves', const Color(0xFFEF4444)),
-                            const SizedBox(width: 10),
-                            _statChip(Icons.chat_bubble_outline_rounded, '$enquiries', 'Msgs', const Color(0xFF10B981)),
-                            const SizedBox(width: 10),
-                            _statChip(Icons.chat_rounded, '$whatsapp', 'WhatsApp', const Color(0xFF25D366)),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8, height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF10B981),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Text('LIVE', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(p.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            const SizedBox(height: 2),
+                            Text(p.location, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                _statChip(Icons.visibility_outlined, '$views', 'Views', const Color(0xFF6366F1)),
+                                const SizedBox(width: 10),
+                                _statChip(Icons.favorite_rounded, '$saves', 'Saves', const Color(0xFFEF4444)),
+                                const SizedBox(width: 10),
+                                _statChip(Icons.chat_bubble_outline_rounded, '$enquiries', 'Enquiries', const Color(0xFF10B981)),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
+                      );
+                    }),
+                  ],
+                );
+              },
             );
           },
         );
       },
     );
   }
+
 
   Widget _statChip(IconData icon, String count, String label, Color color) {
     return Expanded(
@@ -1112,6 +1167,16 @@ class _LandlordDashboardScreenState
       return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     }
     return '${dt.day}/${dt.month}';
+  }
+
+  String _formatCurrency(double amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(2)}M';
+    }
+    if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(1)}K';
+    }
+    return amount.toStringAsFixed(2);
   }
 
   // ─────────────────────────────────────────────────────────────────────────

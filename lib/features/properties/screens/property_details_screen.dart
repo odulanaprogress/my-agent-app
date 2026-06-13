@@ -138,6 +138,9 @@ class _PropertyDetailsScreenState
         tenantUid: uid,
         landlordUid: landlordUid,
       );
+      // Log enquiry + increment Firestore counter
+      UserBehaviorService.logPropertyInquiry(
+          widget.property.id, widget.property.title);
       if (mounted) {
         Navigator.pop(context);
         Navigator.push(
@@ -205,9 +208,13 @@ class _PropertyDetailsScreenState
                 onPressed: () async {
                   final uid = FirebaseAuth.instance.currentUser?.uid;
                   if (uid == null) return;
+                  final wasAlreadyFav = isFavorite;
                   await ref
                       .read(favoritesNotifierProvider.notifier)
                       .toggleFavorite(p.id);
+                  // Increment or decrement favoritesCount in Firestore
+                  UserBehaviorService.logPropertySave(
+                      p.id, p.title, !wasAlreadyFav);
                 },
               ),
               const SizedBox(width: 8),
@@ -447,23 +454,38 @@ class _PropertyDetailsScreenState
 
                 const SizedBox(height: 8),
 
-                // ── Stats row ──────────────────────────────────────
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _stat(Icons.visibility_outlined,
-                          '${p.viewsCount}', 'Views'),
-                      _divider(),
-                      _stat(Icons.favorite_border,
-                          '${p.favoritesCount}', 'Saves'),
-                      _divider(),
-                      _stat(Icons.chat_bubble_outline,
-                          '${p.inquiriesCount}', 'Enquiries'),
-                    ],
-                  ),
+                // ── Stats row (REAL-TIME stream) ───────────────────
+                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('properties')
+                      .doc(p.id)
+                      .snapshots(),
+                  builder: (context, statsSnap) {
+                    final data = statsSnap.data?.data();
+                    int parseInt(dynamic v) {
+                      if (v == null) return 0;
+                      if (v is int) return v;
+                      if (v is num) return v.toInt();
+                      return int.tryParse(v.toString()) ?? 0;
+                    }
+                    final views = data != null ? parseInt(data['viewsCount']) : p.viewsCount;
+                    final saves = data != null ? parseInt(data['favoritesCount']) : p.favoritesCount;
+                    final enquiries = data != null ? parseInt(data['inquiriesCount']) : p.inquiriesCount;
+                    return Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _stat(Icons.visibility_outlined, '$views', 'Views'),
+                          _divider(),
+                          _stat(Icons.favorite_border, '$saves', 'Saves'),
+                          _divider(),
+                          _stat(Icons.chat_bubble_outline, '$enquiries', 'Enquiries'),
+                        ],
+                      ),
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 8),

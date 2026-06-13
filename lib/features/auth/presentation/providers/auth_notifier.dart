@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../../core/services/firebase_auth_service.dart';
 import '../../../../shared/models/user_model.dart';
@@ -114,6 +115,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final storage = SecureStorageService();
       await storage.write(key: 'biometric_email', value: email);
       await storage.write(key: 'biometric_password', value: password);
+
+      // Flag so the dashboard can prompt fingerprint registration on first login
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('just_logged_in', true);
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.message);
     }

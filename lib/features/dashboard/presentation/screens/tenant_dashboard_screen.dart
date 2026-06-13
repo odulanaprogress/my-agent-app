@@ -49,8 +49,14 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
   Future<void> _checkJustRegistered() async {
     final prefs = await SharedPreferences.getInstance();
     final justRegistered = prefs.getBool('just_registered') ?? false;
+    final justLoggedIn = prefs.getBool('just_logged_in') ?? false;
     if (justRegistered) {
       await prefs.setBool('just_registered', false);
+      if (mounted) {
+        await showBiometricRegistrationPromptIfNeeded(context);
+      }
+    } else if (justLoggedIn) {
+      await prefs.setBool('just_logged_in', false);
       if (mounted) {
         await showBiometricRegistrationPromptIfNeeded(context);
       }

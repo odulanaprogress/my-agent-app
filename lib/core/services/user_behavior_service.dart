@@ -35,9 +35,40 @@ class UserBehaviorService {
   static Future<void> logLogout() =>
       log(action: 'logout', description: 'User logged out');
 
-  static Future<void> logPropertyView(String propertyId, String title) =>
-      log(action: 'property_view', description: 'Viewed property: $title',
-          metadata: {'propertyId': propertyId, 'title': title});
+  static Future<void> logPropertyView(String propertyId, String title) async {
+    await log(action: 'property_view', description: 'Viewed property: $title',
+        metadata: {'propertyId': propertyId, 'title': title});
+    try {
+      await _fs.collection('properties').doc(propertyId).update({'viewsCount': FieldValue.increment(1)});
+    } catch (_) {}
+  }
+
+  static Future<void> logPropertyFavorite(String propertyId) async {
+    await log(action: 'property_favorite', description: 'Favorited property', metadata: {'propertyId': propertyId});
+    try {
+      await _fs.collection('properties').doc(propertyId).update({'favoritesCount': FieldValue.increment(1)});
+    } catch (_) {}
+  }
+
+  static Future<void> logPropertyInquiry(String propertyId, String title) async {
+    await log(action: 'property_inquiry', description: 'Inquired about: $title', metadata: {'propertyId': propertyId, 'title': title});
+    try {
+      await _fs.collection('properties').doc(propertyId).update({'inquiriesCount': FieldValue.increment(1)});
+    } catch (_) {}
+  }
+
+  static Future<void> logPropertySave(String propertyId, String title, bool isSaved) async {
+    await log(
+      action: isSaved ? 'save_property' : 'unsave_property',
+      description: '${isSaved ? "Saved" : "Unsaved"} property: $title',
+      metadata: {'propertyId': propertyId, 'title': title},
+    );
+    try {
+      await _fs.collection('properties').doc(propertyId).update({
+        'favoritesCount': FieldValue.increment(isSaved ? 1 : -1),
+      });
+    } catch (_) {}
+  }
 
   static Future<void> logPaymentInitiated(String propertyId, double amount) =>
       log(action: 'payment_initiated', description: 'Payment started',
