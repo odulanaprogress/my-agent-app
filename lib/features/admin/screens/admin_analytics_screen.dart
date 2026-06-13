@@ -1,33 +1,92 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-class AdminAnalyticsScreen extends StatelessWidget {
-  AdminAnalyticsScreen({super.key});
+class AdminAnalyticsScreen extends StatefulWidget {
+  const AdminAnalyticsScreen({super.key});
 
-  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  @override
+  State<AdminAnalyticsScreen> createState() => _AdminAnalyticsScreenState();
+}
 
-  Future<Map<String, dynamic>> fetchAnalytics() async {
-    final usersSnapshot = await firestore.collection('users').get();
-    final propertiesSnapshot = await firestore.collection('properties').get();
-    final pendingSnapshot = await firestore
-        .collection('properties')
-        .where('approvalStatus', isEqualTo: 'pending')
-        .get();
-    final transactionsSnapshot = await firestore.collection('transactions').get();
+class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-    double totalRevenue = 0;
-    for (final doc in transactionsSnapshot.docs) {
-      final data = doc.data();
-      totalRevenue += (data['amount'] ?? 0).toDouble();
+  int _usersCount = 0;
+  int _propertiesCount = 0;
+  int _pendingCount = 0;
+  double _totalRevenue = 0.0;
+  bool _loading = true;
+
+  final List<StreamSubscription> _subscriptions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _initRealtimeAnalytics();
+  }
+
+  @override
+  void dispose() {
+    for (final sub in _subscriptions) {
+      sub.cancel();
     }
+    super.dispose();
+  }
 
-    return {
-      'users': usersSnapshot.docs.length,
-      'properties': propertiesSnapshot.docs.length,
-      'pending': pendingSnapshot.docs.length,
-      'transactions': transactionsSnapshot.docs.length,
-      'revenue': totalRevenue,
-    };
+  void _initRealtimeAnalytics() {
+    // 1. Listen to users
+    _subscriptions.add(
+      _firestore.collection('users').snapshots().listen((snap) {
+        if (!mounted) return;
+        setState(() {
+          _usersCount = snap.docs.length;
+          _loading = false;
+        });
+      }, onError: (err) {
+        debugPrint('Error loading users stream: $err');
+      }),
+    );
+
+    // 2. Listen to properties
+    _subscriptions.add(
+      _firestore.collection('properties').snapshots().listen((snap) {
+        if (!mounted) return;
+        int pending = 0;
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          if (data['approvalStatus'] == 'pending') {
+            pending++;
+          }
+        }
+        setState(() {
+          _propertiesCount = snap.docs.length;
+          _pendingCount = pending;
+          _loading = false;
+        });
+      }, onError: (err) {
+        debugPrint('Error loading properties stream: $err');
+      }),
+    );
+
+    // 3. Listen to transactions (revenue calculation)
+    _subscriptions.add(
+      _firestore.collection('transactions').snapshots().listen((snap) {
+        if (!mounted) return;
+        double revenue = 0.0;
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          revenue += (data['amount'] ?? 0).toDouble();
+        }
+        setState(() {
+          _totalRevenue = revenue;
+          _loading = false;
+        });
+      }, onError: (err) {
+        debugPrint('Error loading transactions stream: $err');
+      }),
+    );
   }
 
   @override
@@ -51,106 +110,91 @@ class AdminAnalyticsScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: fetchAnalytics(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Platform Summary Title
+                  const Text(
+                    'Financial Summary',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
-          if (!snapshot.hasData) {
-            return const Center(
-              child: Text(
-                'Failed to load analytics',
-                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
+                  // Large Revenue Card
+                  _buildAnalyticsCard(
+                    title: 'Platform Gross Revenue',
+                    value: '₦${_totalRevenue.toStringAsFixed(0)}',
+                    subtitle: 'Total processed payments through AGENT gateway',
+                    icon: Icons.account_balance_rounded,
+                    color: const Color(0xFF10B981),
+                    isFullWidth: true,
+                  ),
+                  const SizedBox(height: 24),
+
+                  const Text(
+                    'Resource Metrics',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Grid for items with improved childAspectRatio to prevent overflows
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: 14,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: 1.02, // Adjust aspect ratio to prevent vertical layout clippings
+                    children: [
+                      _buildAnalyticsCard(
+                        title: 'Registered Users',
+                        value: '$_usersCount',
+                        subtitle: 'Active user accounts',
+                        icon: Icons.people_outline_rounded,
+                        color: Colors.indigo,
+                        onTap: () => context.push('/admin/users'),
+                      ),
+                      _buildAnalyticsCard(
+                        title: 'Total Properties',
+                        value: '$_propertiesCount',
+                        subtitle: 'Listings uploaded',
+                        icon: Icons.home_work_outlined,
+                        color: Colors.teal,
+                        onTap: () => context.push('/admin/properties'),
+                      ),
+                      _buildAnalyticsCard(
+                        title: 'Pending Approvals',
+                        value: '$_pendingCount',
+                        subtitle: 'Awaiting moderation',
+                        icon: Icons.hourglass_empty_rounded,
+                        color: Colors.orange,
+                        onTap: () => context.push('/admin/property-approvals'),
+                      ),
+                      _buildAnalyticsCard(
+                        title: 'Revenue',
+                        value: '₦${_totalRevenue.toStringAsFixed(0)}',
+                        subtitle: 'Escrow operations',
+                        icon: Icons.account_balance_wallet_outlined,
+                        color: const Color(0xFF10B981),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
               ),
-            );
-          }
-
-          final data = snapshot.data!;
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Platform Summary Title
-                const Text(
-                  'Financial Summary',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Large Revenue Card
-                _buildAnalyticsCard(
-                  title: 'Platform Gross Revenue',
-                  value: '₦${data['revenue'].toStringAsFixed(0)}',
-                  subtitle: 'Total processed payments through AGENT gateway',
-                  icon: Icons.account_balance_rounded,
-                  color: const Color(0xFF10B981),
-                  isFullWidth: true,
-                ),
-                const SizedBox(height: 24),
-
-                const Text(
-                  'Resource Metrics',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Grid for items
-                GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 1.25,
-                  children: [
-                    _buildAnalyticsCard(
-                      title: 'Registered Users',
-                      value: '${data['users']}',
-                      subtitle: 'Active user accounts',
-                      icon: Icons.people_outline_rounded,
-                      color: Colors.indigo,
-                    ),
-                    _buildAnalyticsCard(
-                      title: 'Total Properties',
-                      value: '${data['properties']}',
-                      subtitle: 'Listings uploaded',
-                      icon: Icons.home_work_outlined,
-                      color: Colors.teal,
-                    ),
-                    _buildAnalyticsCard(
-                      title: 'Pending Approvals',
-                      value: '${data['pending']}',
-                      subtitle: 'Awaiting moderation',
-                      icon: Icons.hourglass_empty_rounded,
-                      color: Colors.orange,
-                    ),
-                    _buildAnalyticsCard(
-                      title: 'Revenue',
-                      value: '₦${data['revenue'].toStringAsFixed(0)}',
-                      subtitle: 'Escrow operations',
-                      icon: Icons.account_balance_wallet_outlined,
-                      color: const Color(0xFF10B981),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-              ],
             ),
-          );
-        },
-      ),
     );
   }
 
@@ -161,10 +205,10 @@ class AdminAnalyticsScreen extends StatelessWidget {
     required IconData icon,
     required Color color,
     bool isFullWidth = false,
+    VoidCallback? onTap,
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -177,49 +221,75 @@ class AdminAnalyticsScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(icon, color: color, size: 14),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: isFullWidth ? 28 : 20,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 10,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: color, size: 18),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: isFullWidth ? 32 : 24,
-              fontWeight: FontWeight.w900,
-              color: const Color(0xFF0F172A),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 11,
-              height: 1.4,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

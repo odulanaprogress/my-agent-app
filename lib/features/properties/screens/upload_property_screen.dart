@@ -2,23 +2,41 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../repositories/property_repository.dart';
 import '../../../core/services/access_control_service.dart';
+import '../../../core/widgets/kyc_gate.dart';
+import '../../verification/verification/providers/verification_provider.dart';
 
-class UploadPropertyScreen extends StatefulWidget {
+class UploadPropertyScreen extends ConsumerStatefulWidget {
   const UploadPropertyScreen({super.key});
 
   @override
-  State<UploadPropertyScreen> createState() => _UploadPropertyScreenState();
+  ConsumerState<UploadPropertyScreen> createState() => _UploadPropertyScreenState();
 }
 
-class _UploadPropertyScreenState extends State<UploadPropertyScreen> {
+class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
   final PropertyRepository repository = PropertyRepository();
   final AccessControlService accessControlService = AccessControlService();
   final ImagePicker picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkKyc());
+  }
+
+  Future<void> _checkKyc() async {
+    if (!mounted) return;
+    final allowed = await KycGate.require(context, ref);
+    if (!allowed && mounted) {
+      // Refresh state when user comes back from verification
+      ref.read(verificationControllerProvider).refresh();
+    }
+  }
 
   final titleController = TextEditingController();
   final descriptionController = TextEditingController();
@@ -79,6 +97,10 @@ class _UploadPropertyScreenState extends State<UploadPropertyScreen> {
 
   // ── Upload ───────────────────────────────────────────────────────────────
   Future<void> _upload() async {
+    // Re-check KYC in case user navigated back without verifying
+    final allowed = await KycGate.require(context, ref);
+    if (!allowed) return;
+
     final isOwner = await accessControlService.isPropertyOwner();
     if (!isOwner) {
       if (!mounted) return;
@@ -456,10 +478,13 @@ class _UploadPropertyScreenState extends State<UploadPropertyScreen> {
 
             DropdownButtonFormField<String>(
               initialValue: listingType,
-              decoration: _inputDec('Listing Option', icon: Icons.sell_outlined),
-              items: ['Sell', 'Rent', 'Lease', 'Shortlet']
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                  .toList(),
+              decoration: _inputDec('Listing Type', icon: Icons.sell_outlined),
+              items: [
+                const DropdownMenuItem(value: 'Sell', child: Text('For Sale (Buy)')),
+                const DropdownMenuItem(value: 'Rent', child: Text('For Rent')),
+                const DropdownMenuItem(value: 'Lease', child: Text('Lease')),
+                const DropdownMenuItem(value: 'Shortlet', child: Text('Shortlet')),
+              ],
               onChanged: (v) => setState(() => listingType = v!),
             ),
             if (listingType != 'Sell') ...[

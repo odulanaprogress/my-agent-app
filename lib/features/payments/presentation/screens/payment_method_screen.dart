@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/user_behavior_service.dart';
+import '../../../../core/widgets/kyc_gate.dart';
 
-class PaymentMethodScreen extends StatefulWidget {
+class PaymentMethodScreen extends ConsumerStatefulWidget {
   const PaymentMethodScreen({super.key});
 
   @override
-  State<PaymentMethodScreen> createState() => _PaymentMethodScreenState();
+  ConsumerState<PaymentMethodScreen> createState() => _PaymentMethodScreenState();
 }
 
-class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
+class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
   String? _selectedPayment;
   bool _isProcessing = false;
   String _paystackStep = '';
 
-  void _simulatePaystackCheckout() {
+  Future<void> _simulatePaystackCheckout() async {
     if (_selectedPayment == null) return;
+
+    final allowed = await KycGate.require(context, ref);
+    if (!allowed) return;
 
     UserBehaviorService.log(
       action: 'payment_initiated',

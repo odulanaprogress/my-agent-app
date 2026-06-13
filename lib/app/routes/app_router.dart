@@ -27,6 +27,7 @@ import '../../features/admin/screens/admin_analytics_screen.dart';
 import '../../features/admin/screens/admin_property_approval_screen.dart';
 import '../../features/admin/screens/admin_verification_screen.dart';
 import '../../features/admin/screens/admin_properties_screen.dart';
+import '../../features/admin/screens/admin_users_screen.dart';
 
 import '../../features/onboarding/presentation/screens/privacy_consent_screen.dart';
 import '../../features/onboarding/presentation/screens/startup_screen.dart';
@@ -55,6 +56,7 @@ const _protectedPaths = {
   '/tenant',
   '/landlord',
   '/admin',
+  '/admin/users',
   '/favorites',
   '/profile',
   '/edit-profile',
@@ -199,6 +201,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/properties',
         builder: (context, state) => const AdminPropertiesScreen(),
+      ),
+      GoRoute(
+        path: '/admin/users',
+        builder: (context, state) => const AdminUsersScreen(),
       ),
       GoRoute(
         path: '/notifications',

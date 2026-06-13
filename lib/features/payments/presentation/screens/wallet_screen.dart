@@ -8,6 +8,7 @@ import '../../providers/payment_provider.dart';
 import '../widgets/wallet_balance_card.dart';
 import '../../data/wallet_repository.dart';
 import 'escrow_details_screen.dart';
+import '../../../../../core/widgets/kyc_gate.dart';
 
 // Real-time wallet data provider
 final _walletDataProvider = StreamProvider.autoDispose<WalletData>((ref) {
@@ -36,6 +37,12 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 
   Future<void> _showDepositSheet() async {
+    // KYC check
+    final allowed = await KycGate.require(context, ref);
+    if (!allowed) return;
+
+    if (!mounted) return;
+
     final result = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
@@ -65,6 +72,12 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 
   Future<void> _showWithdrawSheet(int availableBalance) async {
+    // KYC check
+    final allowed = await KycGate.require(context, ref);
+    if (!allowed) return;
+
+    if (!mounted) return;
+
     final controller = TextEditingController();
     final result = await showModalBottomSheet<int>(
       context: context,

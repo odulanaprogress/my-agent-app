@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/current_user_provider.dart';
@@ -13,6 +14,7 @@ import '../../../../features/properties/screens/edit_property_screen.dart';
 import '../../../../features/landlord/screens/landlord_profile_screen.dart';
 import '../../../../features/chat/presentation/screens/chat_screen.dart';
 import '../../../dashboard/presentation/screens/tenant_dashboard_screen.dart';
+import '../../../../core/widgets/biometric_registration_prompt.dart';
 
 class LandlordDashboardScreen extends ConsumerStatefulWidget {
   const LandlordDashboardScreen({super.key});
@@ -34,43 +36,24 @@ class _LandlordDashboardScreenState
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
+    // Escrow warning is now shown in the KYC verification upload screen
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showEscrowWarning();
+      _checkJustRegistered();
     });
   }
 
-  void _showEscrowWarning() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
-          children: [
-            Icon(Icons.info_outline, color: Color(0xFF1E3A8A), size: 28),
-            SizedBox(width: 12),
-            Text('Escrow Notice', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: const Text(
-          'Notice: All payments run through escrow. Funds are securely held by our partner bank and will drop to your wallet only once the tenant receives possession of the property.',
-          style: TextStyle(height: 1.5, fontSize: 14),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F172A),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _checkJustRegistered() async {
+    final prefs = await SharedPreferences.getInstance();
+    final justRegistered = prefs.getBool('just_registered') ?? false;
+    if (justRegistered) {
+      await prefs.setBool('just_registered', false);
+      if (mounted) {
+        await showBiometricRegistrationPromptIfNeeded(context);
+      }
+    }
   }
+
 
   @override
   void dispose() {
@@ -104,19 +87,29 @@ class _LandlordDashboardScreenState
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
+    // Prompt biometric registration if not set up
+    final proceed = await showBiometricRegistrationPromptIfNeeded(context);
+    if (!proceed) return;
+    if (!context.mounted) return;
+
     final bool? shouldLogout = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirm Logout'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Confirm Logout', style: TextStyle(fontWeight: FontWeight.bold)),
           content: const Text('Are you sure you want to logout?'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
             ),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Logout'),
             ),
@@ -151,6 +144,20 @@ class _LandlordDashboardScreenState
         elevation: 0,
         automaticallyImplyLeading: false,
         actions: [
+          // Help / Tour button
+          Tooltip(
+            message: 'Help & Tour',
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: IconButton(
+                iconSize: 22,
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showHelpSheet(context),
+                icon: const Icon(Icons.help_outline_rounded,
+                    color: Color(0xFF0F172A), size: 22),
+              ),
+            ),
+          ),
           // Tenant View toggle
           Tooltip(
             message: 'Preview as Tenant',
@@ -398,7 +405,7 @@ class _LandlordDashboardScreenState
                 ),
                 const SizedBox(height: 24),
 
-                // Tabs: My Listings | Tenant Messages
+                // Tabs: My Listings | Tenant Messages | Property Analytics
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -418,6 +425,7 @@ class _LandlordDashboardScreenState
                     tabs: const [
                       Tab(text: 'My Listings'),
                       Tab(text: 'Tenant Chats'),
+                      Tab(text: 'Analytics'),
                     ],
                   ),
                 ),
@@ -428,7 +436,9 @@ class _LandlordDashboardScreenState
                   duration: const Duration(milliseconds: 250),
                   child: _tabController.index == 0
                       ? _buildMyListings()
-                      : _buildTenantCommunications(),
+                      : _tabController.index == 1
+                          ? _buildTenantCommunications()
+                          : _buildPropertyBehaviorTab(),
                 ),
 
                 const SizedBox(height: 24),
@@ -890,6 +900,211 @@ class _LandlordDashboardScreenState
       },
     );
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Property Behaviour Analytics Tab (landlord's properties only)
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildPropertyBehaviorTab() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const Center(child: Text('Not logged in.'));
+
+    return FutureBuilder<List<PropertyModel>>(
+      future: PropertyService().getLandlordProperties(uid).first,
+      builder: (context, propSnap) {
+        if (propSnap.connectionState == ConnectionState.waiting) {
+          return const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()));
+        }
+        final properties = propSnap.data ?? [];
+        if (properties.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(40),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.grey.shade100),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.analytics_outlined, size: 48, color: Colors.grey.shade300),
+                const SizedBox(height: 12),
+                Text('No properties yet.', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('Behaviour data will appear once you list a property.', style: TextStyle(color: Colors.grey.shade400, fontSize: 12), textAlign: TextAlign.center),
+              ],
+            ),
+          );
+        }
+
+        final propIds = properties.map((p) => p.id).toList();
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('user_behavior')
+              .where('propertyId', whereIn: propIds)
+              .orderBy('timestamp', descending: true)
+              .limit(50)
+              .snapshots(),
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()));
+            }
+            final docs = snap.data?.docs ?? [];
+            if (docs.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.grey.shade100),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.bar_chart_rounded, size: 48, color: Colors.grey.shade300),
+                    const SizedBox(height: 12),
+                    Text('No activity yet.', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text('Views, saves, and enquiries on your properties will appear here.', style: TextStyle(color: Colors.grey.shade400, fontSize: 12), textAlign: TextAlign.center),
+                  ],
+                ),
+              );
+            }
+
+            // Aggregate by property
+            final Map<String, Map<String, int>> agg = {};
+            for (final doc in docs) {
+              final d = doc.data();
+              final pId = (d['propertyId'] ?? '') as String;
+              final action = (d['action'] ?? 'view') as String;
+              agg.putIfAbsent(pId, () => {});
+              agg[pId]![action] = (agg[pId]![action] ?? 0) + 1;
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Engagement on your ${properties.length} propert${properties.length == 1 ? "y" : "ies"}',
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                  ),
+                ),
+                ...properties.map((p) {
+                  final stats = agg[p.id] ?? {};
+                  final views = stats['view_property'] ?? stats['view'] ?? 0;
+                  final saves = stats['save_property'] ?? stats['save'] ?? 0;
+                  final enquiries = stats['send_enquiry'] ?? stats['enquiry'] ?? 0;
+                  final whatsapp = stats['whatsapp_click'] ?? stats['whatsapp'] ?? 0;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.shade100),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(p.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Text(p.location, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            _statChip(Icons.visibility_outlined, '$views', 'Views', const Color(0xFF6366F1)),
+                            const SizedBox(width: 10),
+                            _statChip(Icons.favorite_rounded, '$saves', 'Saves', const Color(0xFFEF4444)),
+                            const SizedBox(width: 10),
+                            _statChip(Icons.chat_bubble_outline_rounded, '$enquiries', 'Msgs', const Color(0xFF10B981)),
+                            const SizedBox(width: 10),
+                            _statChip(Icons.chat_rounded, '$whatsapp', 'WhatsApp', const Color(0xFF25D366)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _statChip(IconData icon, String count, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(count, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(label, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHelpSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF0F172A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 20),
+            const Text('Landlord Dashboard Guide', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ..._helpItems.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(width: 36, height: 36, decoration: BoxDecoration(color: item.$3.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(item.$1, color: item.$3, size: 18)),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.$2, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(height: 2),
+                      Text(item.$4, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12, height: 1.4)),
+                    ],
+                  )),
+                ],
+              ),
+            )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static const _helpItems = [
+    (Icons.add_circle_outline_rounded, 'Add Property', Color(0xFF6366F1), 'List a property for rent, sale, lease or shortlet. Requires KYC verification.'),
+    (Icons.show_chart_rounded, 'Analytics Tab', Color(0xFF10B981), 'See real-time views, saves, messages, and WhatsApp clicks per property.'),
+    (Icons.forum_outlined, 'Tenant Chats', Color(0xFF0EA5E9), 'All conversations from tenants interested in your listings appear here.'),
+    (Icons.account_balance_wallet_outlined, 'Wallet & Escrow', Color(0xFFF59E0B), 'All payments go through escrow. Funds are released when the tenant confirms possession.'),
+    (Icons.visibility_outlined, 'Tenant Preview', Color(0xFF8B5CF6), 'See exactly how tenants view your listings on the platform.'),
+  ];
 
   String _fmtTime(DateTime dt) {
     final now = DateTime.now();

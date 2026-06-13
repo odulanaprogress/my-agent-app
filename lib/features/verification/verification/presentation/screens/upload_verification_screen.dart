@@ -42,6 +42,7 @@ class _UploadVerificationScreenState
 
   bool _isUploading = false;
   String _uploadProgressMessage = '';
+  bool _escrowAcknowledged = false; // Landlords must acknowledge escrow notice
 
   final _picker = ImagePicker();
 
@@ -174,6 +175,11 @@ class _UploadVerificationScreenState
     if (user == null) return;
 
     final isLandlord = user.role == 'landlord';
+
+    if (isLandlord && !_escrowAcknowledged) {
+      _showError('Please read and acknowledge the Escrow & Payment Notice before submitting.');
+      return;
+    }
 
     // Validation using either selected local files or existing remote URLs
     final hasFront = _idFrontFile != null || (_remoteFrontUrl != null && _remoteFrontUrl!.isNotEmpty);
@@ -448,6 +454,79 @@ class _UploadVerificationScreenState
                                 color: Color(0xFF991B1B),
                                 fontWeight: FontWeight.w500,
                               ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // ── LANDLORD ESCROW NOTICE (must-read) ──────────────────
+                    if (isLandlord) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7ED),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFFB923C), width: 1.5),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C), size: 22),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'MUST READ: Escrow & Payment Policy',
+                                    style: TextStyle(
+                                      color: Color(0xFFEA580C),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              '1. All rental payments on Agent Platform are processed through an Escrow system managed by our licensed payment partner.\n\n'
+                              '2. Funds paid by tenants are held securely by the escrow provider — they are NOT immediately transferred to your bank account.\n\n'
+                              '3. Funds will only be released to your wallet after the tenant confirms they have received possession of the property.\n\n'
+                              '4. Agent Platform charges a platform service fee on all successful transactions. This will be deducted before your payout.\n\n'
+                              '5. Attempting to collect payments outside the platform is a violation of our Terms of Service and may result in account suspension.\n\n'
+                              '6. In the event of a dispute, our team will mediate based on the signed tenancy agreement.',
+                              style: TextStyle(
+                                color: Color(0xFF7C2D12),
+                                fontSize: 12,
+                                height: 1.7,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Checkbox(
+                                  value: _escrowAcknowledged,
+                                  activeColor: const Color(0xFFEA580C),
+                                  onChanged: (v) => setState(() => _escrowAcknowledged = v ?? false),
+                                ),
+                                const Expanded(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(top: 12),
+                                    child: Text(
+                                      'I have read and I understand the Escrow & Payment Policy above.',
+                                      style: TextStyle(
+                                        color: Color(0xFF7C2D12),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

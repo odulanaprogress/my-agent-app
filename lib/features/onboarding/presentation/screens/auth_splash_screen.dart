@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -31,8 +32,14 @@ class _AuthSplashScreenState extends ConsumerState<AuthSplashScreen> {
   }
 
   Future<void> _initAndRoute() async {
-    // Keep splash visible for 6 seconds
-    await Future.delayed(const Duration(seconds: 6));
+    // Sign out any persisted Firebase session so the user must always
+    // authenticate on every fresh app launch. Biometric credentials stored
+    // in SecureStorage are intentionally NOT cleared so fingerprint login
+    // can still retrieve them.
+    await FirebaseAuth.instance.signOut();
+
+    // Keep splash visible for a brief moment
+    await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;
 
     // Capture router BEFORE any further async gaps to avoid

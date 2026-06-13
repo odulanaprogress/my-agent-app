@@ -48,18 +48,11 @@ class _AdminBehaviorLogsScreenState extends State<AdminBehaviorLogsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
+    // Query the latest logs sorted by timestamp. Using a single-field order query requires no composite index.
+    final query = FirebaseFirestore.instance
         .collection('user_behavior_logs')
         .orderBy('timestamp', descending: true)
-        .limit(100);
-
-    if (_filterAction != 'all') {
-      query = FirebaseFirestore.instance
-          .collection('user_behavior_logs')
-          .where('action', isEqualTo: _filterAction)
-          .orderBy('timestamp', descending: true)
-          .limit(100);
-    }
+        .limit(200);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -118,11 +111,28 @@ class _AdminBehaviorLogsScreenState extends State<AdminBehaviorLogsScreen> {
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: query.snapshots(),
               builder: (context, snap) {
+                if (snap.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Text(
+                        'Failed to load behavior logs: ${snap.error}',
+                        style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final docs = snap.data?.docs ?? [];
+                // Filter locally in Dart to bypass composite index constraints
+                var docs = snap.data?.docs ?? [];
+                if (_filterAction != 'all') {
+                  docs = docs.where((doc) => doc.data()['action'] == _filterAction).toList();
+                }
 
                 if (docs.isEmpty) {
                   return Center(

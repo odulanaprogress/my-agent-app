@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/permission_service.dart';
+import '../../../../core/widgets/kyc_gate.dart';
 
-class TenancyAgreementScreen extends StatefulWidget {
+class TenancyAgreementScreen extends ConsumerStatefulWidget {
   final String? propertyId;
   final String? propertyTitle;
   final String? landlordId;
@@ -22,10 +24,10 @@ class TenancyAgreementScreen extends StatefulWidget {
   });
 
   @override
-  State<TenancyAgreementScreen> createState() => _TenancyAgreementScreenState();
+  ConsumerState<TenancyAgreementScreen> createState() => _TenancyAgreementScreenState();
 }
 
-class _TenancyAgreementScreenState extends State<TenancyAgreementScreen>
+class _TenancyAgreementScreenState extends ConsumerState<TenancyAgreementScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final GlobalKey _signatureKey = GlobalKey();
@@ -416,7 +418,12 @@ class _TenancyAgreementScreenState extends State<TenancyAgreementScreen>
                     borderRadius: BorderRadius.circular(16)),
               ),
               onPressed: _agreementAccepted
-                  ? () => _tabController.animateTo(1)
+                  ? () async {
+                      final allowed = await KycGate.require(context, ref);
+                      if (allowed) {
+                        _tabController.animateTo(1);
+                      }
+                    }
                   : null,
             ),
           ),

@@ -10,6 +10,7 @@ import 'auth_state.dart';
 import '../../../../../core/services/user_firestore_service.dart';
 import '../../../../../core/services/user_behavior_service.dart';
 import 'current_user_provider.dart';
+import 'package:agent_app/core/storage/secure_storage_service.dart';
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final FirebaseAuthService _authService;
@@ -109,6 +110,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(status: AuthStatus.loading);
 
       await _authService.signIn(email: email, password: password);
+      
+      final storage = SecureStorageService();
+      await storage.write(key: 'biometric_email', value: email);
+      await storage.write(key: 'biometric_password', value: password);
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.message);
     }
@@ -135,6 +140,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         role: role,
         privacyAccepted: privacyAccepted,
       );
+      
+      final storage = SecureStorageService();
+      await storage.write(key: 'biometric_email', value: email);
+      await storage.write(key: 'biometric_password', value: password);
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.message);
     }

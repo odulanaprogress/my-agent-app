@@ -13,6 +13,7 @@ import '../../../../core/services/user_behavior_service.dart';
 import '../../../../features/ai/screens/ai_chat_screen.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/widgets/biometric_registration_prompt.dart';
 
 class TenantDashboardScreen extends ConsumerStatefulWidget {
   const TenantDashboardScreen({super.key});
@@ -41,7 +42,19 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
       PermissionService.requestLocationPermission(context);
       UserBehaviorService.logLogin();
       _checkAndShowTour();
+      _checkJustRegistered();
     });
+  }
+
+  Future<void> _checkJustRegistered() async {
+    final prefs = await SharedPreferences.getInstance();
+    final justRegistered = prefs.getBool('just_registered') ?? false;
+    if (justRegistered) {
+      await prefs.setBool('just_registered', false);
+      if (mounted) {
+        await showBiometricRegistrationPromptIfNeeded(context);
+      }
+    }
   }
 
   Future<void> _checkAndShowTour() async {
@@ -185,19 +198,29 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
+    // Prompt biometric registration if not set up
+    final proceed = await showBiometricRegistrationPromptIfNeeded(context);
+    if (!proceed) return;
+    if (!context.mounted) return;
+
     final bool? shouldLogout = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirm Logout'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Confirm Logout', style: TextStyle(fontWeight: FontWeight.bold)),
           content: const Text('Are you sure you want to logout?'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
             ),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Logout'),
             ),
@@ -259,6 +282,13 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
             icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F172A)),
             tooltip: 'Notifications',
             onPressed: () => context.push('/notifications'),
+          ),
+          IconButton(
+            iconSize: 20,
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _showHelpSheet(context),
+            icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF0F172A), size: 20),
+            tooltip: 'Help & Tour',
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12, top: 4),
@@ -598,6 +628,60 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
     );
   }
 }
+
+void _showHelpSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F172A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 20),
+          const Text('Tenant App Guide', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          ..._tenantHelpItems.map((item) => Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(width: 36, height: 36, decoration: BoxDecoration(color: item.$3.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(item.$1, color: item.$3, size: 18)),
+                const SizedBox(width: 14),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.$2, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 2),
+                    Text(item.$4, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12, height: 1.4)),
+                  ],
+                )),
+              ],
+            ),
+          )),
+        ],
+      ),
+    ),
+  );
+}
+
+const _tenantHelpItems = [
+  (Icons.search_rounded, 'Search Properties', Color(0xFF6366F1), 'Browse and filter thousands of verified property listings by location, price, and type.'),
+  (Icons.favorite_outlined, 'Save Favourites', Color(0xFFEF4444), 'Tap the heart icon on any property to save it to your Saved list.'),
+  (Icons.account_balance_wallet_outlined, 'Wallet & Payments', Color(0xFF10B981), 'Top up your wallet and pay rent securely through our escrow system.'),
+  (Icons.verified_user_outlined, 'KYC Verification', Color(0xFFF59E0B), 'Complete identity verification to unlock payments and rental agreements.'),
+  (Icons.chat_bubble_outline, 'Message Landlords', Color(0xFF0EA5E9), 'Directly message property owners from any listing page.'),
+  (Icons.smart_toy_rounded, 'AI Assistant', Color(0xFF8B5CF6), 'Get instant answers about properties, pricing, and the rental process.'),
+  (Icons.draw_rounded, 'Tenancy Agreement', Color(0xFF0F172A), 'Sign your digital rental agreement safely within the app.'),
+  (Icons.support_agent_rounded, 'Customer Support', Color(0xFF64748B), 'Raise tickets or chat with our live support team anytime.'),
+];
 
 class _QuickAction {
   final IconData icon;
