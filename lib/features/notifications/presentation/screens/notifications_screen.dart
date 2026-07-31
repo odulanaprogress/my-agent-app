@@ -7,6 +7,7 @@ import '../../data/notification_repository.dart';
 import '../providers/notification_provider.dart';
 import '../widgets/empty_notifications_widget.dart';
 import '../widgets/notification_tile.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -39,7 +40,11 @@ class NotificationsScreen extends ConsumerWidget {
         stream: repo.watchUserNotifications(uid: uid, limit: 20),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 6,
+              itemBuilder: (_, __) => const SkeletonListTile(),
+            );
           }
 
           final items = snap.data ?? [];

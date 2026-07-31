@@ -10,6 +10,8 @@ import '../../../admin/screens/admin_support_tickets_screen.dart';
 import '../../../admin/screens/admin_behavior_logs_screen.dart';
 import '../../../admin/screens/customer_support_dashboard_screen.dart';
 import 'tenant_dashboard_screen.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -229,7 +231,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: AppLoader(size: 24))
           : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               children: [
@@ -460,6 +462,16 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       builder: (_) => const CustomerSupportDashboardScreen(),
                     ),
                   ),
+                ),
+                const SizedBox(height: 12),
+
+                _buildAdminActionTile(
+                  title: 'Security & Attack Logs',
+                  subtitle: 'Monitor simulated attacks & push notifications',
+                  icon: Icons.security_rounded,
+                  color: Colors.redAccent.shade700,
+                  badgeCount: 0,
+                  onTap: () => context.push('/admin/security'),
                 ),
                 const SizedBox(height: 40),
               ],

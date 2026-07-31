@@ -8,6 +8,8 @@ import '../../../core/widgets/property_card.dart';
 import 'property_details_screen.dart';
 
 import '../models/property_model.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class PropertyScreen extends StatefulWidget {
   const PropertyScreen({super.key});
@@ -78,7 +80,6 @@ class _PropertyScreenState extends State<PropertyScreen> {
               .toList() ??
           <String>[],
       contactPhone: (data['contactPhone'] ?? '').toString(),
-      whatsappNumber: (data['whatsappNumber'] ?? '').toString(),
 
       approvalStatus: (data['approvalStatus'] ?? 'pending').toString(),
       isApproved:
@@ -144,7 +145,7 @@ class _PropertyScreenState extends State<PropertyScreen> {
               builder: (context, snapshot) {
                 // LOADING
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: AppLoader(size: 24));
                 }
 
                 // ERROR

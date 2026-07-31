@@ -34,12 +34,16 @@ class _VerificationStatusScreenState
         title: const Text('Verification Status'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: context.canPop()
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                onPressed: () => context.pop(),
-              )
-            : null,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A)),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/auth');
+            }
+          },
+        ),
       ),
       body: SafeArea(
         child: Padding(

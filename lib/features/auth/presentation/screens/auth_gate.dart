@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/auth_state.dart';
@@ -11,7 +11,6 @@ import '../../../dashboard/presentation/screens/admin_dashboard_screen.dart';
 import '../../../admin/screens/customer_support_dashboard_screen.dart';
 
 import 'login_screen.dart';
-
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
@@ -21,7 +20,10 @@ class AuthGate extends ConsumerWidget {
 
     switch (authState.status) {
       case AuthStatus.loading:
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        return const Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(child: AppLoader(size: 64)),
+        );
 
       case AuthStatus.authenticated:
         final user = ref.watch(currentUserProvider);

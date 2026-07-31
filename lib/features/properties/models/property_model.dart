@@ -21,7 +21,6 @@ class PropertyModel {
   final List<String> imageUrls;
   final List<String> videoUrls;
   final String contactPhone;
-  final String whatsappNumber;
 
   final String approvalStatus; // pending | approved | rejected
   final bool isApproved;
@@ -43,7 +42,6 @@ class PropertyModel {
   bool get isPremium => approvalStatus == 'approved' && isApproved;
   List<String> get favorites => const [];
   String get contact => contactPhone;
-  String get whatsapp => whatsappNumber;
 
   const PropertyModel({
     required this.id,
@@ -61,7 +59,6 @@ class PropertyModel {
     required this.imageUrls,
     required this.videoUrls,
     required this.contactPhone,
-    required this.whatsappNumber,
     required this.approvalStatus,
     required this.isApproved,
     required this.viewsCount,
@@ -89,12 +86,10 @@ class PropertyModel {
       'imageUrls': imageUrls,
       'videoUrls': videoUrls,
       'contactPhone': contactPhone,
-      'whatsappNumber': whatsappNumber,
       'approvalStatus': approvalStatus,
       'isApproved': isApproved,
-      'viewsCount': viewsCount,
-      'favoritesCount': favoritesCount,
-      'inquiriesCount': inquiriesCount,
+      // Analytics counters (viewsCount, favoritesCount, inquiriesCount) are omitted 
+      // from toMap() so they aren't accidentally overwritten when editing a property.
       'createdAt': Timestamp.fromDate(createdAt),
       'listingType': listingType,
       'rentalDurationUnit': rentalDurationUnit,
@@ -153,7 +148,6 @@ class PropertyModel {
           ? List<String>.from((map['videoUrls'] as List).map((e) => '$e'))
           : <String>[],
       contactPhone: map['contactPhone'] ?? map['contact'] ?? '',
-      whatsappNumber: map['whatsappNumber'] ?? map['whatsapp'] ?? '',
       // Legacy compatibility
       approvalStatus: map['approvalStatus'] ?? 'pending',
       isApproved: map['isApproved'] == true || map['isApproved'] == 1,

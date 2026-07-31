@@ -39,7 +39,6 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      PermissionService.requestLocationPermission(context);
       UserBehaviorService.logLogin();
       _checkAndShowTour();
       _checkJustRegistered();
@@ -58,6 +57,19 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
     } else if (justLoggedIn) {
       await prefs.setBool('just_logged_in', false);
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_outline_rounded, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Login successful. Welcome back!', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
         await showBiometricRegistrationPromptIfNeeded(context);
       }
     }
@@ -287,12 +299,15 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
           IconButton(
             icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F172A)),
             tooltip: 'Notifications',
-            onPressed: () => context.push('/notifications'),
+            onPressed: () async {
+              await PermissionService.requestNotificationPermission(context);
+              if (context.mounted) context.push('/notifications');
+            },
           ),
           IconButton(
             iconSize: 20,
             visualDensity: VisualDensity.compact,
-            onPressed: () => _showHelpSheet(context),
+            onPressed: () => _showHelpSheet(),
             icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF0F172A), size: 20),
             tooltip: 'Help & Tour',
           ),
@@ -633,49 +648,66 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
       },
     );
   }
-}
-
-void _showHelpSheet(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
-          const SizedBox(height: 20),
-          const Text('Tenant App Guide', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          ..._tenantHelpItems.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  void _showHelpSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF0F172A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(width: 36, height: 36, decoration: BoxDecoration(color: item.$3.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(item.$1, color: item.$3, size: 18)),
-                const SizedBox(width: 14),
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.$2, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-                    const SizedBox(height: 2),
-                    Text(item.$4, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12, height: 1.4)),
-                  ],
-                )),
+                const Text('Tenant App Guide', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showTour();
+                  },
+                  icon: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 18),
+                  label: const Text('Start Tour', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  ),
+                ),
               ],
             ),
-          )),
-        ],
+            const SizedBox(height: 16),
+            ..._tenantHelpItems.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(width: 36, height: 36, decoration: BoxDecoration(color: item.$3.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(item.$1, color: item.$3, size: 18)),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.$2, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(height: 2),
+                      Text(item.$4, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12, height: 1.4)),
+                    ],
+                  )),
+                ],
+              ),
+            )),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 const _tenantHelpItems = [

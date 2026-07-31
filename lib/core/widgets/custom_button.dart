@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/text_styles.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class CustomButton extends StatelessWidget {
   final String text;
@@ -30,7 +32,7 @@ class CustomButton extends StatelessWidget {
           ),
         ),
         child: isLoading
-            ? const CircularProgressIndicator(color: Colors.white)
+            ? AppLoader(size: 24)
             : Text(text, style: AppTextStyles.button),
       ),
     );

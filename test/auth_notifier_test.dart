@@ -40,6 +40,12 @@ class MockFirebaseAuthService implements FirebaseAuthService {
   Future<fb.UserCredential?> signInWithGoogle() async {
     throw UnimplementedError();
   }
+
+  @override
+  Future<void> sendEmailVerification() async {}
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {}
 }
 
 class MockUserFirestoreService implements UserFirestoreService {

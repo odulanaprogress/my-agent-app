@@ -15,6 +15,10 @@ import '../../../../features/landlord/screens/landlord_profile_screen.dart';
 import '../../../../features/chat/presentation/screens/chat_screen.dart';
 import '../../../dashboard/presentation/screens/tenant_dashboard_screen.dart';
 import '../../../../core/widgets/biometric_registration_prompt.dart';
+import '../../../../core/services/permission_service.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class LandlordDashboardScreen extends ConsumerStatefulWidget {
   const LandlordDashboardScreen({super.key});
@@ -56,6 +60,19 @@ class _LandlordDashboardScreenState
     } else if (justLoggedIn) {
       await prefs.setBool('just_logged_in', false);
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_outline_rounded, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Login successful. Welcome back!', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
         await showBiometricRegistrationPromptIfNeeded(context);
       }
     }
@@ -151,6 +168,15 @@ class _LandlordDashboardScreenState
         elevation: 0,
         automaticallyImplyLeading: false,
         actions: [
+          // Notifications
+          IconButton(
+            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F172A)),
+            tooltip: 'Notifications',
+            onPressed: () async {
+              await PermissionService.requestNotificationPermission(context);
+              if (context.mounted) context.push('/notifications');
+            },
+          ),
           // Help / Tour button
           Tooltip(
             message: 'Help & Tour',
@@ -329,10 +355,7 @@ class _LandlordDashboardScreenState
                               txSnap.connectionState == ConnectionState.waiting
                                   ? const SizedBox(
                                       width: 16, height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white54,
-                                      ))
+                                      child: AppLoader(size: 24))
                                   : const Icon(Icons.trending_up_rounded,
                                       color: Colors.green, size: 20),
                             ],
@@ -551,7 +574,7 @@ class _LandlordDashboardScreenState
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 40),
-          child: CircularProgressIndicator(),
+          child: AppLoader(size: 24),
         ),
       );
     }
@@ -560,11 +583,8 @@ class _LandlordDashboardScreenState
       stream: PropertyService().getLandlordProperties(uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: CircularProgressIndicator(),
-            ),
+          return Column(
+            children: List.generate(3, (index) => const SkeletonCard()),
           );
         }
         if (snapshot.hasError) {
@@ -727,11 +747,8 @@ class _LandlordDashboardScreenState
           .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: CircularProgressIndicator(),
-            ),
+          return Column(
+            children: List.generate(3, (index) => const SkeletonCard()),
           );
         }
 
@@ -958,7 +975,7 @@ class _LandlordDashboardScreenState
       stream: PropertyService().getLandlordProperties(uid),
       builder: (context, propSnap) {
         if (propSnap.connectionState == ConnectionState.waiting) {
-          return const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()));
+          return const Center(child: Padding(padding: EdgeInsets.all(40), child: AppLoader(size: 24)));
         }
         final properties = propSnap.data ?? [];
         if (properties.isEmpty) {
@@ -981,108 +998,61 @@ class _LandlordDashboardScreenState
           );
         }
 
-        final propIds = properties.map((p) => p.id).toList();
-
-        // Stream live behaviour events for this landlord's properties
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('user_behavior_logs')
-              .where('metadata.propertyId', whereIn: propIds)
-              .orderBy('timestamp', descending: true)
-              .limit(200)
-              .snapshots(),
-          builder: (context, logSnap) {
-            // Also stream the property docs themselves so the stats
-            // row (viewsCount etc.) reflects Firestore counters in real-time
-            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance
-                  .collection('properties')
-                  .where(FieldPath.documentId, whereIn: propIds)
-                  .snapshots(),
-              builder: (context, propDocSnap) {
-                if (logSnap.connectionState == ConnectionState.waiting &&
-                    propDocSnap.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()),
-                  );
-                }
-
-                // Build a map propertyId -> live Firestore data
-                final Map<String, Map<String, dynamic>> liveProps = {};
-                for (final doc in propDocSnap.data?.docs ?? []) {
-                  liveProps[doc.id] = doc.data();
-                }
-
-                int parseInt(dynamic v) {
-                  if (v == null) return 0;
-                  if (v is int) return v;
-                  if (v is num) return v.toInt();
-                  return int.tryParse(v.toString()) ?? 0;
-                }
-
-                return Column(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Live engagement on your ${properties.length} propert${properties.length == 1 ? "y" : "ies"}',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              ),
+            ),
+            ...properties.map((p) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey.shade100),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+                ),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        'Live engagement on your ${properties.length} propert${properties.length == 1 ? "y" : "ies"}',
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8, height: 8,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text('LIVE', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                      ],
                     ),
-                    ...properties.map((p) {
-                      final live = liveProps[p.id];
-                      final views = live != null ? parseInt(live['viewsCount']) : p.viewsCount;
-                      final saves = live != null ? parseInt(live['favoritesCount']) : p.favoritesCount;
-                      final enquiries = live != null ? parseInt(live['inquiriesCount']) : p.inquiriesCount;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 14),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey.shade100),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8, height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF10B981),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Text('LIVE', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(p.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 2),
-                            Text(p.location, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                _statChip(Icons.visibility_outlined, '$views', 'Views', const Color(0xFF6366F1)),
-                                const SizedBox(width: 10),
-                                _statChip(Icons.favorite_rounded, '$saves', 'Saves', const Color(0xFFEF4444)),
-                                const SizedBox(width: 10),
-                                _statChip(Icons.chat_bubble_outline_rounded, '$enquiries', 'Enquiries', const Color(0xFF10B981)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
+                    const SizedBox(height: 6),
+                    Text(p.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(p.location, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _statChip(Icons.visibility_outlined, '${p.viewsCount}', 'Views', const Color(0xFF6366F1)),
+                        const SizedBox(width: 10),
+                        _statChip(Icons.favorite_rounded, '${p.favoritesCount}', 'Saves', const Color(0xFFEF4444)),
+                        const SizedBox(width: 10),
+                        _statChip(Icons.chat_bubble_outline_rounded, '${p.inquiriesCount}', 'Enquiries', const Color(0xFF10B981)),
+                      ],
+                    ),
                   ],
-                );
-              },
-            );
-          },
+                ),
+              );
+            }),
+          ],
         );
       },
     );

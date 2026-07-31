@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/screens/auth_gate.dart';
+import '../../features/auth/presentation/screens/email_verification_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/fingerprint_login_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
@@ -28,6 +29,7 @@ import '../../features/admin/screens/admin_property_approval_screen.dart';
 import '../../features/admin/screens/admin_verification_screen.dart';
 import '../../features/admin/screens/admin_properties_screen.dart';
 import '../../features/admin/screens/admin_users_screen.dart';
+import '../../features/admin/screens/admin_security_dashboard_screen.dart';
 
 import '../../features/onboarding/presentation/screens/privacy_consent_screen.dart';
 import '../../features/onboarding/presentation/screens/startup_screen.dart';
@@ -57,6 +59,7 @@ const _protectedPaths = {
   '/landlord',
   '/admin',
   '/admin/users',
+  '/admin/security',
   '/favorites',
   '/profile',
   '/edit-profile',
@@ -118,10 +121,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Not authenticated → redirect from protected pages to /login
       if (!isAuthenticated && isProtected) return '/login';
 
-      // Authenticated → don't let them sit on /login or /register
-      if (isAuthenticated &&
-          (path == '/login' || path == '/register')) {
-        return '/auth';
+      // Email Verification Check (TEMPORARILY DISABLED)
+      // All users are treated as verified for now
+      if (isAuthenticated) {
+        if (path == '/login' || path == '/register' || path == '/verify-email') {
+          return '/auth';
+        }
       }
 
       return null;
@@ -207,6 +212,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AdminUsersScreen(),
       ),
       GoRoute(
+        path: '/admin/security',
+        builder: (context, state) => const AdminSecurityDashboardScreen(),
+      ),
+      GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsScreen(),
       ),
@@ -260,6 +269,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/verify-email',
+        builder: (context, state) => const EmailVerificationScreen(),
       ),
       GoRoute(
         path: '/properties/upload',

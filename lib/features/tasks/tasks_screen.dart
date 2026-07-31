@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/services/task_service.dart';
 import '../properties/models/task_model.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -48,7 +50,7 @@ class _TasksScreenState extends State<TasksScreen> {
               stream: taskService.getTasks(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: AppLoader(size: 24));
                 }
 
                 final tasks = snapshot.data ?? [];

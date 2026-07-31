@@ -9,7 +9,11 @@ class PropertyService {
 
   /// ADD PROPERTY
   Future<void> addProperty(PropertyModel property) async {
-    await _firestore.collection(collection).add(property.toMap());
+    final propertyMap = property.toMap();
+    propertyMap['viewsCount'] = 0;
+    propertyMap['favoritesCount'] = 0;
+    propertyMap['inquiriesCount'] = 0;
+    await _firestore.collection(collection).add(propertyMap);
   }
 
   /// GET ALL PROPERTIES (REALTIME)

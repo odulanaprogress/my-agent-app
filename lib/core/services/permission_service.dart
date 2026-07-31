@@ -90,4 +90,50 @@ class PermissionService {
     final result = await Permission.storage.request();
     return result.isGranted;
   }
+
+  static Future<bool> requestNotificationPermission(BuildContext context) async {
+    final status = await Permission.notification.status;
+    if (status.isGranted) return true;
+
+    if (context.mounted) {
+      final bool? proceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.notifications_active_outlined, color: Color(0xFF6366F1)),
+              SizedBox(width: 10),
+              Text('Notifications'),
+            ],
+          ),
+          content: const Text(
+            'AGENT needs notification access to send you alerts about property updates, messages, and payments.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Maybe Later', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Allow'),
+            ),
+          ],
+        ),
+      );
+
+      if (proceed != true) return false;
+    }
+
+    // You can also use OneSignal.Notifications.requestPermission(true)
+    // but flutter's permission_handler handles system dialog nicely too.
+    final result = await Permission.notification.request();
+    return result.isGranted;
+  }
 }

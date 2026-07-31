@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'routes/app_router.dart';
 import 'theme/app_theme.dart';
+import '../core/widgets/global_notification_listener.dart';
 
 class AgentApp extends ConsumerWidget {
   const AgentApp({super.key});
@@ -14,6 +15,11 @@ class AgentApp extends ConsumerWidget {
       title: 'AGENT',
       theme: AppTheme.lightTheme,
       routerConfig: (ref.watch(routerProvider)),
+      builder: (context, child) {
+        return GlobalNotificationListener(
+          child: child ?? const SizedBox(),
+        );
+      },
     );
   }
 }

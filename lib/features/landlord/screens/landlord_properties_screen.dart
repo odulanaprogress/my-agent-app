@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../properties/models/property_model.dart';
 import '../../properties/repositories/property_repository.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class LandlordPropertiesScreen extends StatelessWidget {
   LandlordPropertiesScreen({super.key});
@@ -27,7 +29,7 @@ class LandlordPropertiesScreen extends StatelessWidget {
         stream: repository.getLandlordProperties(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -122,9 +124,38 @@ class LandlordPropertiesScreen extends StatelessWidget {
                                     backgroundColor: Colors.red,
                                   ),
                                   onPressed: () async {
-                                    await repository.deleteProperty(
-                                      property.id,
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Delete Property'),
+                                        content: const Text(
+                                            'Are you sure you want to delete this property? This action cannot be undone.'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            style: TextButton.styleFrom(
+                                              foregroundColor: Colors.red,
+                                            ),
+                                            onPressed: () => Navigator.pop(ctx, true),
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
+                                      ),
                                     );
+
+                                    if (confirm == true) {
+                                      await repository.deleteProperty(property.id);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Property deleted'),
+                                          ),
+                                        );
+                                      }
+                                    }
                                   },
                                   child: const Text('Delete'),
                                 ),

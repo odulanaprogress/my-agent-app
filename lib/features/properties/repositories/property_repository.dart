@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/services/cloudinary_service.dart';
-import '../../notifications/repositories/notification_repository.dart';
+import '../../../core/services/onesignal_api_service.dart';
 import '../models/property_model.dart';
 
 class PropertyRepository {
@@ -60,8 +60,7 @@ class PropertyRepository {
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
   final FirebaseAuth auth = FirebaseAuth.instance;
 
-  final NotificationRepository notificationRepository =
-      NotificationRepository();
+
 
   Future<String?> uploadProperty({
     required String title,
@@ -76,7 +75,6 @@ class PropertyRepository {
     required List<File> images,
     File? videoFile,
     required String contactPhone,
-    required String whatsappNumber,
     String listingType = 'rent',
     String? rentalDurationUnit,
     int? rentalDurationValue,
@@ -132,7 +130,6 @@ class PropertyRepository {
         imageUrls: uploadedImageUrls,
         videoUrls: uploadedVideoUrls,
         contactPhone: contactPhone,
-        whatsappNumber: whatsappNumber,
         isApproved: false,
         approvalStatus: 'pending',
         viewsCount: 0,
@@ -144,7 +141,22 @@ class PropertyRepository {
         rentalDurationValue: rentalDurationValue,
       );
 
-      await propertyDoc.set(property.toMap());
+      final propertyMap = property.toMap();
+      propertyMap['viewsCount'] = 0;
+      propertyMap['favoritesCount'] = 0;
+      propertyMap['inquiriesCount'] = 0;
+      await propertyDoc.set(propertyMap);
+
+      // Notify Admins
+      try {
+        await OneSignalApiService.notifyAllAdmins(
+          heading: 'New Property Uploaded',
+          content: '${userData?['fullName'] ?? 'A landlord'} uploaded "${property.title}" for review.',
+        );
+      } catch (e) {
+        print('Push notification error: $e');
+      }
+
       return null;
     } catch (e) {
       return e.toString();
@@ -195,11 +207,18 @@ class PropertyRepository {
       'approvalStatus': 'approved',
     });
 
-    await notificationRepository.createNotification(
-      userId: propertyData?['ownerId'],
-      title: 'Property Approved',
-      body: 'Your property has been approved and published.',
-    );
+
+    try {
+      if (propertyData?['ownerId'] != null) {
+        await OneSignalApiService.sendPropertyStatusNotification(
+          propertyTitle: propertyData?['title'] ?? 'Your property',
+          status: 'approved',
+          receiverUid: propertyData!['ownerId'],
+        );
+      }
+    } catch (e) {
+      print('Push notification error: $e');
+    }
   }
 
   Future<void> rejectProperty(String propertyId) async {
@@ -214,11 +233,18 @@ class PropertyRepository {
       'approvalStatus': 'rejected',
     });
 
-    await notificationRepository.createNotification(
-      userId: propertyData?['ownerId'],
-      title: 'Property Rejected',
-      body: 'Your property was rejected by admin review.',
-    );
+
+    try {
+      if (propertyData?['ownerId'] != null) {
+        await OneSignalApiService.sendPropertyStatusNotification(
+          propertyTitle: propertyData?['title'] ?? 'Your property',
+          status: 'rejected',
+          receiverUid: propertyData!['ownerId'],
+        );
+      }
+    } catch (e) {
+      print('Push notification error: $e');
+    }
   }
 
   Future<void> deleteProperty(String propertyId) async {

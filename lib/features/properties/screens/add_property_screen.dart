@@ -7,6 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/services/cloudinary_service.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class AddPropertyScreen extends StatefulWidget {
   const AddPropertyScreen({super.key});
@@ -20,7 +22,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final priceController = TextEditingController();
   final locationController = TextEditingController();
   final contactController = TextEditingController();
-  final whatsappController = TextEditingController();
 
   File? imageFile;
   Uint8List? webImage;
@@ -75,7 +76,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         priceController.text.isEmpty ||
         locationController.text.isEmpty ||
         contactController.text.isEmpty ||
-        whatsappController.text.isEmpty ||
         (imageFile == null && webImage == null)) {
       ScaffoldMessenger.of(
         context,
@@ -96,7 +96,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         'location': locationController.text,
         'imageUrl': imageUrl,
         'contact': contactController.text,
-        'whatsapp': whatsappController.text,
         'ownerId': FirebaseAuth.instance.currentUser?.uid ?? '',
         'isPremium': false,
         'favorites': [],
@@ -128,7 +127,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     priceController.dispose();
     locationController.dispose();
     contactController.dispose();
-    whatsappController.dispose();
     amenityController.dispose();
     super.dispose();
   }
@@ -184,12 +182,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: 'Contact Number'),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: whatsappController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'WhatsApp Number'),
-            ),
 
             const SizedBox(height: 20),
 
@@ -237,7 +229,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               child: ElevatedButton(
                 onPressed: isLoading ? null : addProperty,
                 child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? AppLoader(size: 24)
                     : const Text('Upload Property'),
               ),
             ),

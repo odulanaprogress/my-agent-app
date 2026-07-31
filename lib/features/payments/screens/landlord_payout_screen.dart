@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/transaction_model.dart';
 import '../data/payment_repository.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class LandlordPayoutScreen extends StatelessWidget {
   const LandlordPayoutScreen({super.key});
@@ -18,7 +20,7 @@ class LandlordPayoutScreen extends StatelessWidget {
         stream: repository.getLandlordTransactions(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {

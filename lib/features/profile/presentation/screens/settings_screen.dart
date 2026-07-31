@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/current_user_provider.dart';
 import '../widgets/settings_tile.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -107,6 +111,59 @@ class SettingsScreen extends ConsumerWidget {
               await ref.read(authNotifierProvider.notifier).logout();
               if (!context.mounted) return;
               context.go('/login');
+            },
+          ),
+          
+          SettingsTile(
+            icon: Icons.delete_forever,
+            title: 'Delete Account',
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Delete Account'),
+                  content: const Text(
+                      'Are you sure you want to completely delete your account and data? This action cannot be undone.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Delete Permanently'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                try {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => Center(child: AppLoader(size: 24)),
+                  );
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    await FirebaseFirestore.instance.collection('users').doc(user.uid).delete();
+                    await user.delete();
+                  }
+                  await ref.read(authNotifierProvider.notifier).logout();
+                  if (context.mounted) {
+                    Navigator.pop(context); // Close loading
+                    context.go('/login');
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    Navigator.pop(context); // Close loading
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to delete account: $e. You may need to re-login to perform this action.')),
+                    );
+                  }
+                }
+              }
             },
           ),
         ],

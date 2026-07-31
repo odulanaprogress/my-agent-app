@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/favorites_repository.dart';
 import 'favorites_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../notifications/repositories/notification_repository.dart';
 
 // ── Toggle notifier ──────────────────────────────────────────────────────────
 //
@@ -49,6 +51,22 @@ class FavoritesNotifier extends StateNotifier<Set<String>> {
     } else {
       state = {...state, propertyId};
       await _repository.addFavorite(uid: uid, propertyId: propertyId);
+      
+      // Send notification to landlord
+      try {
+        final doc = await FirebaseFirestore.instance.collection('properties').doc(propertyId).get();
+        if (doc.exists) {
+          final ownerId = doc.data()?['ownerId'];
+          final title = doc.data()?['title'] ?? 'your property';
+          if (ownerId != null && ownerId != uid) {
+            await NotificationRepository().createNotification(
+              userId: ownerId,
+              title: 'New Favorite ❤️',
+              body: 'Someone just added $title to their favorites.',
+            );
+          }
+        }
+      } catch (_) {}
     }
   }
 

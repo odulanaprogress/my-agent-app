@@ -2,12 +2,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../providers/onboarding_provider.dart';
 import '../providers/privacy_provider.dart';
 import '../providers/startup_provider.dart';
 
-/// Canonical splash/entry screen used by `GoRouter`.
+/// Canonical splash/entry screen used by GoRouter.
 ///
 /// Flow:
 /// 1) If privacy not accepted -> /privacy
@@ -94,12 +95,15 @@ class _AuthSplashScreenState extends ConsumerState<AuthSplashScreen> {
             ),
             const SizedBox(height: 24),
             // App name
-            const Text(
-              'AGENT',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+            Shimmer.fromColors(
+              baseColor: const Color(0xFF0F172A),
+              highlightColor: Colors.grey.shade400,
+              child: const Text(
+                'AGENT',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],

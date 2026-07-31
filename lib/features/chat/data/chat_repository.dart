@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/services/onesignal_api_service.dart';
 
 class ChatRepository {
   final FirebaseFirestore _firestore;
@@ -27,7 +28,11 @@ class ChatRepository {
         if (bTime == null) return -1; // a is newer
         return bTime.compareTo(aTime); // descending
       });
-      return docs.map((d) => d.id).toList();
+      return docs.where((d) {
+        final data = d.data();
+        final deletedBy = data['deletedBy'] as List<dynamic>? ?? [];
+        return !deletedBy.contains(uid);
+      }).map((d) => d.id).toList();
     });
   }
 
@@ -65,6 +70,9 @@ class ChatRepository {
           'lastMessage': '',
           'lastMessageTime': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
+          'deletedBy': [],
+          'blockedBy': [],
+          'isClosed': false,
         });
       }
     });
@@ -88,27 +96,56 @@ class ChatRepository {
     required String senderId,
     required String receiverId,
     required String message,
+    String? replyToId,
+    String? replyToText,
+    String? replyToSender,
   }) async {
+    final convDoc = await conversations.doc(conversationId).get();
+    if (convDoc.exists) {
+      final data = convDoc.data()!;
+      if (data['isClosed'] == true) throw Exception('This ticket is closed.');
+      if ((data['blockedBy'] as List<dynamic>? ?? []).isNotEmpty) throw Exception('Action not allowed. User is blocked.');
+    }
+
     final msgRef = conversations
         .doc(conversationId)
         .collection('messages')
         .doc();
 
+    final msgData = {
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'message': message,
+      'messageType': 'text',
+      'isRead': false,
+      'sentAt': FieldValue.serverTimestamp(),
+      if (replyToId != null) 'replyToId': replyToId,
+      if (replyToText != null) 'replyToText': replyToText,
+      if (replyToSender != null) 'replyToSender': replyToSender,
+    };
+
     await _firestore.runTransaction((tx) async {
-      tx.set(msgRef, {
-        'senderId': senderId,
-        'receiverId': receiverId,
-        'message': message,
-        'messageType': 'text',
-        'isRead': false,
-        'sentAt': FieldValue.serverTimestamp(),
-      });
+      tx.set(msgRef, msgData);
 
       tx.update(conversations.doc(conversationId), {
         'lastMessage': message,
         'lastMessageTime': FieldValue.serverTimestamp(),
       });
     });
+
+    // Send push notification
+    try {
+      final senderDoc = await _firestore.collection('users').doc(senderId).get();
+      final senderName = senderDoc.data()?['name'] ?? senderDoc.data()?['fullName'] ?? 'Someone';
+      await OneSignalApiService.sendChatMessageNotification(
+        senderName: senderName,
+        messageText: message,
+        receiverUid: receiverId,
+        conversationId: conversationId,
+      );
+    } catch (e) {
+      print('Push notification error: $e');
+    }
   }
 
   Future<void> sendAttachmentMessage({
@@ -119,6 +156,13 @@ class ChatRepository {
     required String fileType, // image | video | pdf
     required String fileName,
   }) async {
+    final convDoc = await conversations.doc(conversationId).get();
+    if (convDoc.exists) {
+      final data = convDoc.data()!;
+      if (data['isClosed'] == true) throw Exception('This ticket is closed.');
+      if ((data['blockedBy'] as List<dynamic>? ?? []).isNotEmpty) throw Exception('Action not allowed. User is blocked.');
+    }
+
     final msgRef = conversations
         .doc(conversationId)
         .collection('messages')
@@ -140,6 +184,126 @@ class ChatRepository {
         'lastMessage': '[Attachment: $fileType]',
         'lastMessageTime': FieldValue.serverTimestamp(),
       });
+    });
+
+    // Send push notification
+    try {
+      final senderDoc = await _firestore.collection('users').doc(senderId).get();
+      final senderName = senderDoc.data()?['name'] ?? senderDoc.data()?['fullName'] ?? 'Someone';
+      await OneSignalApiService.sendChatMessageNotification(
+        senderName: senderName,
+        messageText: '[Attachment: $fileType]',
+        receiverUid: receiverId,
+        conversationId: conversationId,
+      );
+    } catch (e) {
+      print('Push notification error: $e');
+    }
+  }
+
+  Future<void> sendVoiceMessage({
+    required String conversationId,
+    required String senderId,
+    required String receiverId,
+    required String fileUrl,
+    required String durationStr,
+    String? replyToId,
+    String? replyToText,
+    String? replyToSender,
+  }) async {
+    final convDoc = await conversations.doc(conversationId).get();
+    if (convDoc.exists) {
+      final data = convDoc.data()!;
+      if (data['isClosed'] == true) throw Exception('This ticket is closed.');
+      if ((data['blockedBy'] as List<dynamic>? ?? []).isNotEmpty) throw Exception('Action not allowed. User is blocked.');
+    }
+
+    final msgRef = conversations
+        .doc(conversationId)
+        .collection('messages')
+        .doc();
+
+    final msgData = {
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'message': 'Voice Message $durationStr',
+      'messageType': 'audio',
+      'fileUrl': fileUrl,
+      'isRead': false,
+      'sentAt': FieldValue.serverTimestamp(),
+      if (replyToId != null) 'replyToId': replyToId,
+      if (replyToText != null) 'replyToText': replyToText,
+      if (replyToSender != null) 'replyToSender': replyToSender,
+    };
+
+    await _firestore.runTransaction((tx) async {
+      tx.set(msgRef, msgData);
+
+      tx.update(conversations.doc(conversationId), {
+        'lastMessage': 'Voice Message $durationStr',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      });
+    });
+
+    // Send push notification
+    try {
+      final senderDoc = await _firestore.collection('users').doc(senderId).get();
+      final senderName = senderDoc.data()?['name'] ?? senderDoc.data()?['fullName'] ?? 'Someone';
+      await OneSignalApiService.sendChatMessageNotification(
+        senderName: senderName,
+        messageText: 'Sent a voice message',
+        receiverUid: receiverId,
+        conversationId: conversationId,
+      );
+    } catch (e) {
+      print('Push notification error: $e');
+    }
+  }
+
+  Future<void> deleteChat(String conversationId, String uid) async {
+    final docRef = conversations.doc(conversationId);
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(docRef);
+      if (!snap.exists) return;
+      
+      List<dynamic> deletedBy = List.from(snap.data()?['deletedBy'] ?? []);
+      if (!deletedBy.contains(uid)) {
+        deletedBy.add(uid);
+      }
+      
+      List<dynamic> participants = List.from(snap.data()?['participants'] ?? []);
+      
+      // If both participants have deleted it, actually delete the doc
+      if (deletedBy.length >= participants.length && participants.isNotEmpty) {
+        tx.delete(docRef);
+      } else {
+        tx.update(docRef, {'deletedBy': deletedBy});
+      }
+    });
+  }
+
+  Future<void> toggleBlockUser(String conversationId, String uid, bool block) async {
+    final docRef = conversations.doc(conversationId);
+    if (block) {
+      await docRef.update({
+        'blockedBy': FieldValue.arrayUnion([uid])
+      });
+    } else {
+      await docRef.update({
+        'blockedBy': FieldValue.arrayRemove([uid])
+      });
+    }
+  }
+
+  Future<void> closeTicket(String conversationId, String history) async {
+    final docRef = conversations.doc(conversationId);
+    await docRef.update({'isClosed': true});
+    
+    // Save history to a new collection
+    await _firestore.collection('ticket_histories').add({
+      'conversationId': conversationId,
+      'history': history,
+      'closedAt': FieldValue.serverTimestamp(),
     });
   }
 }

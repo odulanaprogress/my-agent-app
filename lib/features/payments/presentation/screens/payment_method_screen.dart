@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/user_behavior_service.dart';
 import '../../../../core/widgets/kyc_gate.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class PaymentMethodScreen extends ConsumerStatefulWidget {
   const PaymentMethodScreen({super.key});
@@ -276,9 +278,7 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(
-                        color: Color(0xFF09A5DB),
-                      ),
+                      AppLoader(size: 24),
                       const SizedBox(height: 24),
                       const Text(
                         'SECURE PAYSTACK CHECKOUT',

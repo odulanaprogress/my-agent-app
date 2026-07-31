@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../properties/models/property_model.dart';
 import '../../properties/screens/property_details_screen.dart';
 import '../repositories/favorites_repository.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class FavoritesScreen extends StatelessWidget {
   FavoritesScreen({super.key});
@@ -20,7 +22,7 @@ class FavoritesScreen extends StatelessWidget {
         stream: repository.getFavorites(),
         builder: (context, favoriteSnapshot) {
           if (favoriteSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           final favoriteIds = favoriteSnapshot.data ?? [];
@@ -36,7 +38,7 @@ class FavoritesScreen extends StatelessWidget {
                 .snapshots(),
             builder: (context, propertySnapshot) {
               if (propertySnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return Center(child: AppLoader(size: 24));
               }
 
               if (!propertySnapshot.hasData ||

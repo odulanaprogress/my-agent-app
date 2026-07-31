@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 import '../../../../../core/services/firebase_auth_service.dart';
 import '../../../../shared/models/user_model.dart';
@@ -10,13 +11,17 @@ import 'auth_state.dart';
 
 import '../../../../../core/services/user_firestore_service.dart';
 import '../../../../../core/services/user_behavior_service.dart';
+import '../../../../../core/services/onesignal_api_service.dart';
 import 'current_user_provider.dart';
 import 'package:agent_app/core/storage/secure_storage_service.dart';
+import 'package:agent_app/core/storage/user_cache_service.dart';
+import '../../../../../core/services/security_alert_service.dart';
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final FirebaseAuthService _authService;
   final UserFirestoreService _userFirestoreService;
   final Ref _ref;
+  int _failedLoginAttempts = 0;
 
   AuthNotifier(
     this._authService, {
@@ -33,10 +38,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (user == null) {
         _ref.read(currentUserProvider.notifier).state = null;
         state = state.copyWith(status: AuthStatus.unauthenticated);
+        OneSignal.logout();
         return;
       }
 
+      OneSignal.login(user.uid);
+
       try {
+        final cacheService = UserCacheService();
+        var cachedProfile = await cacheService.getCachedUser();
+
+        if (cachedProfile != null && cachedProfile.uid == user.uid) {
+          _ref.read(currentUserProvider.notifier).state = cachedProfile;
+          state = state.copyWith(status: AuthStatus.authenticated);
+        } else if (cachedProfile != null) {
+          await cacheService.clearCache();
+          cachedProfile = null;
+        }
+
         var profile = await _userFirestoreService.getUserProfile(user.uid);
 
         if (user.email != null && user.email!.trim().toLowerCase() == 'agentadminsupport@gmail.com') {
@@ -85,7 +104,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
         // If user doc is missing, keep UX responsive and fall back to an unauthenticated state.
         // This prevents the gate from getting stuck in loading.
-        if (profile == null) {
+        if (profile == null && cachedProfile == null) {
           _ref.read(currentUserProvider.notifier).state = null;
           state = state.copyWith(
             status: AuthStatus.error,
@@ -94,9 +113,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
           return;
         }
 
-        _ref.read(currentUserProvider.notifier).state = profile;
-        state = state.copyWith(status: AuthStatus.authenticated);
+        if (profile != null) {
+          await cacheService.saveUser(profile);
+          _ref.read(currentUserProvider.notifier).state = profile;
+          state = state.copyWith(status: AuthStatus.authenticated);
+        } else if (cachedProfile != null) {
+          profile = cachedProfile;
+        }
+        
         UserBehaviorService.logLogin(method: 'email_or_google');
+
+        // Link this device to the user's UID in OneSignal
+        OneSignal.login(user.uid);
+
+        // Request notification permissions and await user's choice
+        final granted = await OneSignal.Notifications.requestPermission(true);
+
+        if (granted) {
+          // Welcome back notification
+          try {
+            // Delay to allow OneSignal time to link the new device token to the UID
+            await Future.delayed(const Duration(seconds: 4));
+            await OneSignalApiService.sendNotification(
+              receiverUids: [user.uid],
+              heading: 'Welcome Back!',
+              content: 'You have successfully logged in to AGENT.',
+            );
+          } catch (e) {
+            print('Push notification error: $e');
+          }
+        }
       } catch (e) {
         state = state.copyWith(
           status: AuthStatus.error,
@@ -111,6 +157,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(status: AuthStatus.loading);
 
       await _authService.signIn(email: email, password: password);
+      _failedLoginAttempts = 0;
       
       final storage = SecureStorageService();
       await storage.write(key: 'biometric_email', value: email);
@@ -120,7 +167,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('just_logged_in', true);
     } on FirebaseAuthException catch (e) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: e.message);
+      _failedLoginAttempts++;
+      if (_failedLoginAttempts >= 3) {
+        await SecurityAlertService.reportAttack(
+          'Multiple Failed Logins',
+          'User attempted to login with email $email and failed $_failedLoginAttempts times.',
+          metadata: {'email': email, 'error': e.toString()},
+        );
+      }
+      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
+    } catch (e) {
+      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
     }
   }
 
@@ -150,12 +207,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await storage.write(key: 'biometric_email', value: email);
       await storage.write(key: 'biometric_password', value: password);
     } on FirebaseAuthException catch (e) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: e.message);
+      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
+    } catch (e) {
+      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
     }
   }
 
   Future<void> logout() async {
-    await UserBehaviorService.logLogout();
+    try {
+      await UserBehaviorService.logLogout();
+    } catch (_) {
+      // Ignored to ensure logout proceeds even if offline
+    }
+    await UserCacheService().clearCache();
+    OneSignal.logout();
     await _authService.signOut();
   }
 
@@ -172,4 +237,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
     }
   }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _authService.sendPasswordResetEmail(email);
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? 'An error occurred while sending the reset link.');
+    } catch (e) {
+      throw Exception('An unexpected error occurred.');
+    }
+  }
+
+  Future<void> sendEmailVerification() async {
+    try {
+      await _authService.sendEmailVerification();
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? 'An error occurred while sending the verification email.');
+    } catch (e) {
+      throw Exception('An unexpected error occurred.');
+    }
+  }
 }
+

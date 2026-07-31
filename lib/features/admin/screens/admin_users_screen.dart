@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:agent_app/shared/models/user_model.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -235,6 +237,41 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
               child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
+            IconButton(
+              icon: const Icon(Icons.delete_forever, color: Colors.red),
+              tooltip: 'Delete User',
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete User'),
+                    content: const Text('Are you sure you want to permanently delete this user from the database?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      TextButton(
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  Navigator.pop(context); // close edit dialog
+                  try {
+                    await _firestore.collection('users').doc(user.uid).delete();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User deleted')));
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+                    }
+                  }
+                }
+              },
+            ),
           ],
         ),
       ),
@@ -266,7 +303,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         stream: _firestore.collection('users').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {

@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../app/theme/text_styles.dart';
 import '../../../../core/constants/storage_keys.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -56,7 +58,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Image.asset(
               'assets/images/agent_logo.png',
               width: 140,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              errorBuilder: (_, a, b) => const SizedBox.shrink(),
             ),
             const SizedBox(height: 24),
             Text(
@@ -65,11 +67,11 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Nigeria’s Trusted Real Estate Platform',
+              'Nigeria\'s Trusted Real Estate Platform',
               style: AppTextStyles.body.copyWith(color: Colors.white70),
             ),
             const SizedBox(height: 40),
-            const CircularProgressIndicator(color: Colors.white),
+            AppLoader(size: 24),
           ],
         ),
       ),

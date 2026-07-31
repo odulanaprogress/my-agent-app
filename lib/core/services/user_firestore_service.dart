@@ -1,12 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../shared/models/user_model.dart';
+import '../storage/user_cache_service.dart';
 
 class UserFirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<void> createUserProfile(UserModel user) async {
     await _firestore.collection('users').doc(user.uid).set(user.toMap());
+    await UserCacheService().saveUser(user);
   }
 
   Future<UserModel?> getUserProfile(String uid) async {
@@ -20,5 +22,10 @@ class UserFirestoreService {
     required Map<String, dynamic> data,
   }) async {
     await _firestore.collection('users').doc(uid).update(data);
+    
+    final updatedProfile = await getUserProfile(uid);
+    if (updatedProfile != null) {
+      await UserCacheService().saveUser(updatedProfile);
+    }
   }
 }

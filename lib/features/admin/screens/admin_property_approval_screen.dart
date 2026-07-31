@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../properties/models/property_model.dart';
 import '../../properties/repositories/property_repository.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class AdminPropertyApprovalScreen extends StatelessWidget {
   AdminPropertyApprovalScreen({super.key});
@@ -38,7 +40,7 @@ class AdminPropertyApprovalScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {

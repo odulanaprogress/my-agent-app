@@ -5,36 +5,38 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../providers/auth_provider.dart';
 import '../providers/auth_state.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 /// Maps Firebase error codes to human-friendly messages.
 String _friendlyError(String? raw) {
-  if (raw == null) return 'Something went wrong. Please try again.';
+  if (raw == null) return 'Oops! Something went wrong. Please try again.';
   final r = raw.toLowerCase();
   if (r.contains('wrong-password') || r.contains('invalid-credential') || r.contains('invalid credential')) {
-    return 'Incorrect email or password. Please try again.';
+    return 'Hmm, that email or password isn\'t quite right. Give it another shot!';
   }
   if (r.contains('user-not-found')) {
-    return 'No account found with this email. Try signing up.';
+    return 'We couldn\'t find an account with this email. Want to sign up instead?';
   }
   if (r.contains('user-disabled')) {
-    return 'Your account has been suspended. Contact support.';
+    return 'Your account has been suspended. Please contact our support team.';
   }
   if (r.contains('too-many-requests')) {
-    return 'Too many attempts. Please wait a moment and try again.';
+    return 'Whoa, too many attempts! Please wait a moment before trying again.';
   }
   if (r.contains('network-request-failed')) {
-    return 'No internet connection. Check your network and try again.';
+    return 'Looks like you\'re offline. Please check your internet connection.';
   }
   if (r.contains('email-already-in-use')) {
-    return 'An account already exists with this email. Try logging in.';
+    return 'An account with this email already exists! Try signing in instead.';
   }
   if (r.contains('weak-password')) {
-    return 'Password must be at least 8 characters.';
+    return 'Your password needs to be at least 8 characters long.';
   }
   if (r.contains('invalid-email')) {
-    return 'Please enter a valid email address.';
+    return 'Please enter a valid email address format (e.g., name@example.com).';
   }
-  return 'Login failed. Please check your details and try again.';
+  return 'Login failed. Please double-check your details and try again.';
 }
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -342,10 +344,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ? const SizedBox(
                                   width: 24,
                                   height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2.5,
-                                  ),
+                                  child: AppLoader(size: 24),
                                 )
                               : const Text(
                                   'Sign In',

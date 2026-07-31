@@ -10,6 +10,8 @@ import '../repositories/property_repository.dart';
 import '../../../core/services/access_control_service.dart';
 import '../../../core/widgets/kyc_gate.dart';
 import '../../verification/verification/providers/verification_provider.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class UploadPropertyScreen extends ConsumerStatefulWidget {
   const UploadPropertyScreen({super.key});
@@ -45,7 +47,6 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
   final lgaController = TextEditingController();
   final communityController = TextEditingController();
   final phoneController = TextEditingController();
-  final whatsappController = TextEditingController();
 
   String category = 'Apartment';
   String state = 'Lagos';
@@ -138,7 +139,6 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
       images: selectedImages,
       videoFile: selectedVideo,
       contactPhone: phoneController.text.trim(),
-      whatsappNumber: whatsappController.text.trim(),
       listingType: typeVal,
       rentalDurationUnit: unitVal,
       rentalDurationValue: valueVal,
@@ -176,7 +176,6 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
     lgaController.dispose();
     communityController.dispose();
     phoneController.dispose();
-    whatsappController.dispose();
     durationController.dispose();
     super.dispose();
   }
@@ -644,13 +643,6 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
               keyboardType: TextInputType.phone,
               decoration: _inputDec('Phone Number', icon: Icons.phone_outlined),
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: whatsappController,
-              keyboardType: TextInputType.phone,
-              decoration:
-                  _inputDec('WhatsApp Number', icon: Icons.chat),
-            ),
 
             const SizedBox(height: 32),
 
@@ -674,10 +666,7 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
                     ? const SizedBox(
                         height: 24,
                         width: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
+                        child: AppLoader(size: 24),
                       )
                     : const Row(
                         mainAxisAlignment: MainAxisAlignment.center,

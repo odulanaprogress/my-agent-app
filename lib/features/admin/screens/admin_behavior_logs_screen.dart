@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class AdminBehaviorLogsScreen extends StatefulWidget {
   const AdminBehaviorLogsScreen({super.key});
@@ -125,7 +127,7 @@ class _AdminBehaviorLogsScreenState extends State<AdminBehaviorLogsScreen> {
                 }
 
                 if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: AppLoader(size: 24));
                 }
 
                 // Filter locally in Dart to bypass composite index constraints

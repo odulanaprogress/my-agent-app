@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models/notification_model.dart';
 import '../repositories/notification_repository.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class NotificationsScreen extends StatelessWidget {
   NotificationsScreen({super.key});
@@ -16,7 +18,7 @@ class NotificationsScreen extends StatelessWidget {
         stream: repository.getNotifications(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {

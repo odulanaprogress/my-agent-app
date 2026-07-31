@@ -7,27 +7,29 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../providers/auth_state.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 /// Maps Firebase error codes to friendly messages (same helper as login_screen).
 String _friendlyError(String? raw) {
-  if (raw == null) return 'Something went wrong. Please try again.';
+  if (raw == null) return 'Oops! Something went wrong. Please try again.';
   final r = raw.toLowerCase();
   if (r.contains('email-already-in-use')) {
-    return 'An account already exists with this email. Try logging in instead.';
+    return 'An account with this email already exists! Try logging in instead.';
   }
   if (r.contains('weak-password')) {
-    return 'Password must be at least 8 characters.';
+    return 'Your password needs to be at least 8 characters long.';
   }
   if (r.contains('invalid-email')) {
-    return 'Please enter a valid email address.';
+    return 'Please enter a valid email address format (e.g., name@example.com).';
   }
   if (r.contains('network-request-failed')) {
-    return 'No internet connection. Check your network and try again.';
+    return 'Looks like you\'re offline. Please check your internet connection.';
   }
   if (r.contains('too-many-requests')) {
-    return 'Too many attempts. Please wait a moment and try again.';
+    return 'Whoa, too many attempts! Please wait a moment before trying again.';
   }
-  return 'Registration failed. Please check your details and try again.';
+  return 'Registration failed. Please double-check your details and try again.';
 }
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -93,10 +95,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
       _setError(passwordError);
       return false;
     }
-    if (password.length < 8) {
-      _setError('Password must be at least 8 characters.');
-      return false;
-    }
+
     if (password != confirmPassword) {
       _setError('Passwords do not match. Please re-check.');
       return false;
@@ -403,7 +402,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                                       ? const SizedBox(
                                           width: 24,
                                           height: 24,
-                                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                          child: AppLoader(size: 24),
                                         )
                                       : const Text(
                                           'Create Account',

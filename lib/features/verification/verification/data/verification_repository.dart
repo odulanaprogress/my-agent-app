@@ -93,6 +93,15 @@ class VerificationRepository {
       'verificationStatus': newStatus.asFirestoreValue,
       'isVerified': newStatus == VerificationStatus.approved,
     }, SetOptions(merge: true));
+
+    final statusString = newStatus == VerificationStatus.approved ? 'approved' : 'rejected';
+    await _firestore.collection('notifications').add({
+      'userId': uid,
+      'title': 'Verification Update',
+      'body': 'Your verification request has been $statusString.',
+      'isRead': false,
+      'createdAt': Timestamp.now(),
+    });
   }
 
 }

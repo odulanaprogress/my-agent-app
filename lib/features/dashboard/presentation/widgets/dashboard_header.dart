@@ -25,13 +25,15 @@ class DashboardHeader extends ConsumerWidget {
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
-              'Welcome Back 👋',
-              style: TextStyle(color: Colors.grey, fontSize: 15),
+              user?.fullName != null && user!.fullName.isNotEmpty
+                  ? 'Welcome back, ${user.fullName.split(' ').first} 👋'
+                  : 'Welcome Back 👋',
+              style: const TextStyle(color: Colors.grey, fontSize: 15),
             ),
-            SizedBox(height: 6),
-            Text(
+            const SizedBox(height: 6),
+            const Text(
               'Discover Properties',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),

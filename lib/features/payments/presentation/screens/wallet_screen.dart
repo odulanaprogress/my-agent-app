@@ -9,6 +9,8 @@ import '../widgets/wallet_balance_card.dart';
 import '../../data/wallet_repository.dart';
 import 'escrow_details_screen.dart';
 import '../../../../../core/widgets/kyc_gate.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 // Real-time wallet data provider
 final _walletDataProvider = StreamProvider.autoDispose<WalletData>((ref) {
@@ -319,7 +321,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   loading: () => const Center(
                     child: Padding(
                       padding: EdgeInsets.all(24),
-                      child: CircularProgressIndicator(),
+                      child: AppLoader(size: 24),
                     ),
                   ),
                   error: (err, _) => Text(
@@ -472,7 +474,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           ],
         ),
         child: isLoading
-            ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
+            ? const Center(child: SizedBox(width: 20, height: 20, child: AppLoader(size: 24)))
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -655,7 +657,7 @@ class _PaystackDepositSheetState extends State<_PaystackDepositSheet> {
                           ? const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                                SizedBox(width: 18, height: 18, child: AppLoader(size: 24)),
                                 SizedBox(width: 10),
                                 Text('Processing via Paystack...'),
                               ],

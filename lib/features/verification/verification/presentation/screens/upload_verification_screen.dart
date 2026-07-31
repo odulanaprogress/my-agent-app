@@ -10,6 +10,8 @@ import '../../domain/verification_status.dart';
 import '../../../../../core/services/cloudinary_service.dart';
 import '../../../../auth/presentation/providers/current_user_provider.dart';
 import '../../../../../core/services/user_behavior_service.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class UploadVerificationScreen extends ConsumerStatefulWidget {
   const UploadVerificationScreen({super.key});
@@ -288,7 +290,7 @@ class _UploadVerificationScreenState
           backgroundColor: Colors.green,
         ),
       );
-      context.pop();
+      context.go('/auth');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -339,7 +341,13 @@ class _UploadVerificationScreenState
           backgroundColor: Colors.transparent,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A)),
-            onPressed: () => context.pop(),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/auth');
+              }
+            },
           ),
         ),
         body: Center(
@@ -369,7 +377,13 @@ class _UploadVerificationScreenState
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/auth');
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0F172A),
                       foregroundColor: Colors.white,
@@ -397,7 +411,13 @@ class _UploadVerificationScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A)),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/auth');
+            }
+          },
         ),
       ),
       body: Stack(
@@ -814,9 +834,7 @@ class _UploadVerificationScreenState
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(
-                        color: Color(0xFF0F172A),
-                      ),
+                      AppLoader(size: 24),
                       const SizedBox(height: 20),
                       Text(
                         _uploadProgressMessage,

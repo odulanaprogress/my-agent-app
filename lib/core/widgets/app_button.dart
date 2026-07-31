@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class AppButton extends StatelessWidget {
   final String text;
@@ -26,10 +28,7 @@ class AppButton extends StatelessWidget {
             ? const SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.white,
-                ),
+                child: AppLoader(size: 24),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,

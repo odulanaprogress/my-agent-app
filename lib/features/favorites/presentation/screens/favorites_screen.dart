@@ -11,6 +11,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/favorites_notifier.dart';
 import '../../../../core/services/property_service.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 
 class FavoritesScreen extends ConsumerWidget {
 
@@ -42,7 +43,11 @@ class FavoritesScreen extends ConsumerWidget {
             )
           // Watch the user's saved property IDs (from Firestore user subcollection)
           : ref.watch(favoritesIdsProvider).when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => ListView.builder(
+                padding: const EdgeInsets.all(20),
+                itemCount: 3,
+                itemBuilder: (_, __) => const SkeletonCard(),
+              ),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (ids) {
                 if (ids.isEmpty) {
@@ -55,7 +60,11 @@ class FavoritesScreen extends ConsumerWidget {
                   stream: PropertyService().getApprovedProperties(),
                   builder: (context, snap) {
                     if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(20),
+                        itemCount: 3,
+                        itemBuilder: (_, __) => const SkeletonCard(),
+                      );
                     }
                     if (snap.hasError) {
                       return Center(

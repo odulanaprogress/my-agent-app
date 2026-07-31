@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 /// Admin screen showing all open support tickets from tenants.
 /// Admin can reply to each ticket.
@@ -33,7 +35,7 @@ class AdminSupportTicketsScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           final docs = snap.data?.docs ?? [];
@@ -261,6 +263,51 @@ class _TicketChatScreenState extends State<_TicketChatScreen> {
     }
   }
 
+  Future<void> _closeTicket() async {
+    setState(() => _sending = true);
+    try {
+      // 1. Fetch all messages
+      final messagesSnap = await _messages.orderBy('createdAt').get();
+      final messagesList = messagesSnap.docs.map((d) => d.data()).toList();
+      
+      // 2. Fetch ticket info
+      final ticketSnap = await _firestore.collection('support_tickets').doc(widget.userUid).get();
+      final ticketData = ticketSnap.data() ?? {};
+
+      // 3. Save to closed_tickets_history
+      await _firestore.collection('closed_tickets_history').add({
+        'ticketId': widget.userUid,
+        'userId': widget.userUid,
+        'userEmail': ticketData['userEmail'] ?? '',
+        'userName': ticketData['userName'] ?? 'Unknown',
+        'subject': ticketData['subject'] ?? 'Support Inquiry',
+        'history': messagesList,
+        'closedAt': FieldValue.serverTimestamp(),
+      });
+
+      // 4. Update ticket status to closed
+      await _firestore.collection('support_tickets').doc(widget.userUid).update({
+        'status': 'closed',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ticket closed and history saved.')),
+        );
+        Navigator.pop(context); // Go back to tickets list
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to close ticket: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   void dispose() {
     _msgController.dispose();
@@ -279,6 +326,37 @@ class _TicketChatScreenState extends State<_TicketChatScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close_rounded, color: Colors.red),
+            tooltip: 'Close Ticket',
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Close Ticket'),
+                  content: const Text(
+                      'This will close the ticket, stop further chats, and save the history. Proceed?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                await _closeTicket();
+              }
+            },
+          ),
+        ],
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -304,7 +382,7 @@ class _TicketChatScreenState extends State<_TicketChatScreen> {
               builder: (context, snap) {
                 final docs = snap.data?.docs ?? [];
                 if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: AppLoader(size: 24));
                 }
 
                 return ListView.builder(
@@ -457,8 +535,7 @@ class _TicketChatScreenState extends State<_TicketChatScreen> {
                         child: _sending
                             ? const Padding(
                                 padding: EdgeInsets.all(12),
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2),
+                                child: AppLoader(size: 24),
                               )
                             : const Icon(Icons.send_rounded,
                                 color: Colors.white, size: 20),

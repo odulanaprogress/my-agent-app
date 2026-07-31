@@ -46,78 +46,15 @@ class FirebaseAuthService {
     required String email,
     required String password,
   }) async {
-    final cleanEmail = email.trim().toLowerCase();
-    if (cleanEmail == 'agentadminsupport@gmail.com' && password.trim() == 'Agentadmin12@') {
-      try {
-        return await _firebaseAuth.signInWithEmailAndPassword(
-          email: cleanEmail,
-          password: password.trim(),
-        );
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'user-not-found' || e.code == 'invalid-credential' || e.code == 'invalid-email') {
-          try {
-            final credential = await _firebaseAuth.createUserWithEmailAndPassword(
-              email: cleanEmail,
-              password: password.trim(),
-            );
-            final uid = credential.user!.uid;
-            final userProfile = UserModel(
-              uid: uid,
-              email: cleanEmail,
-              fullName: 'Platform Admin',
-              role: 'admin',
-              isVerified: true,
-              privacyAccepted: true,
-              onboardingCompleted: true,
-              createdAt: DateTime.now(),
-            );
-            await _firestore.collection('users').doc(uid).set(userProfile.toMap());
-            return credential;
-          } catch (registerError) {
-            // Fall through to rethrow the original sign in error if registration fails
-          }
-        }
-        rethrow;
-      }
-    } else if (cleanEmail == 'agentcustomercare@gmail.com' && password.trim() == 'Agentcustomer12@') {
-      try {
-        return await _firebaseAuth.signInWithEmailAndPassword(
-          email: cleanEmail,
-          password: password.trim(),
-        );
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'user-not-found' || e.code == 'invalid-credential' || e.code == 'invalid-email') {
-          try {
-            final credential = await _firebaseAuth.createUserWithEmailAndPassword(
-              email: cleanEmail,
-              password: password.trim(),
-            );
-            final uid = credential.user!.uid;
-            final userProfile = UserModel(
-              uid: uid,
-              email: cleanEmail,
-              fullName: 'Customer Care Support',
-              role: 'customer_support',
-              isVerified: true,
-              privacyAccepted: true,
-              onboardingCompleted: true,
-              createdAt: DateTime.now(),
-            );
-            await _firestore.collection('users').doc(uid).set(userProfile.toMap());
-            return credential;
-          } catch (registerError) {
-            // Fall through to rethrow original error
-          }
-        }
-        rethrow;
-      }
-    }
-
+    // All users — including admin and customer support — sign in the same way.
+    // Role-based routing is handled by reading `users/{uid}.role` from Firestore
+    // after authentication. Hardcoded credentials MUST NOT exist in client code.
     return await _firebaseAuth.signInWithEmailAndPassword(
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       password: password.trim(),
     );
   }
+
 
   Future<UserCredential> register({
     required String email,
@@ -210,5 +147,16 @@ class FirebaseAuthService {
     } catch (_) {}
 
     await _firebaseAuth.signOut();
+  }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _firebaseAuth.sendPasswordResetEmail(email: email.trim());
+  }
+
+  Future<void> sendEmailVerification() async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
   }
 }

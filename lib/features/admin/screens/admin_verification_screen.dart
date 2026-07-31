@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../verification/verification/domain/verification_status.dart';
 import '../../verification/verification/domain/verification_type.dart';
 import '../../verification/verification/providers/verification_provider.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class AdminVerificationScreen extends ConsumerWidget {
   AdminVerificationScreen({super.key});
@@ -191,7 +193,7 @@ class AdminVerificationScreen extends ConsumerWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {

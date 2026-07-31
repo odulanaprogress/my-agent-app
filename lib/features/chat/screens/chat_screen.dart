@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../models/message_model.dart';
 import '../repositories/chat_repository.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class ChatScreen extends StatefulWidget {
   final String receiverId;
@@ -28,15 +30,59 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = messageController.text.trim();
     if (text.isEmpty) return;
 
-    await repository.sendMessage(receiverId: widget.receiverId, message: text);
-
-    messageController.clear();
+    try {
+      await repository.sendMessage(receiverId: widget.receiverId, message: text);
+      messageController.clear();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.receiverName)),
+      appBar: AppBar(
+        title: Text(widget.receiverName),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'block') {
+                await repository.blockUser(widget.receiverId);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('User blocked.')),
+                  );
+                }
+              } else if (value == 'delete') {
+                await repository.deleteChat(widget.receiverId);
+                if (context.mounted) {
+                  Navigator.pop(context); // Go back after deleting chat
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Chat deleted.')),
+                  );
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'block',
+                child: Text('Block User'),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Delete Chat'),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -44,7 +90,7 @@ class _ChatScreenState extends State<ChatScreen> {
               stream: repository.getMessages(widget.receiverId),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: AppLoader(size: 24));
                 }
 
                 final messages = snapshot.data!;

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../widgets/verification_badge.dart';
 import '../providers/profile_provider.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class VerificationScreen extends ConsumerWidget {
   const VerificationScreen({super.key});
@@ -22,7 +24,7 @@ class VerificationScreen extends ConsumerWidget {
         ),
       ),
       body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Center(child: AppLoader(size: 24)),
         error: (e, _) => Center(child: Text('Failed to load: $e')),
         data: (profile) {
           final isVerified = profile?['isVerified'] == true;

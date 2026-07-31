@@ -7,6 +7,8 @@ import '../../providers/payment_provider.dart';
 import '../../data/transaction_model.dart';
 import '../../../auth/presentation/providers/current_user_provider.dart';
 import '../widgets/escrow_status_badge.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class EscrowDetailsScreen extends ConsumerWidget {
   const EscrowDetailsScreen({super.key, required this.transactionId});
@@ -27,7 +29,7 @@ class EscrowDetailsScreen extends ConsumerWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Color(0xFFF8FAFC),
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(child: AppLoader(size: 24)),
           );
         }
 
@@ -146,8 +148,7 @@ class EscrowDetailsScreen extends ConsumerWidget {
                           showDialog(
                             context: context,
                             barrierDismissible: false,
-                            builder: (context) => const Center(
-                              child: CircularProgressIndicator(),
+                            builder: (context) => Center(child: AppLoader(size: 24),
                             ),
                           );
                           try {
@@ -189,8 +190,7 @@ class EscrowDetailsScreen extends ConsumerWidget {
                           showDialog(
                             context: context,
                             barrierDismissible: false,
-                            builder: (context) => const Center(
-                              child: CircularProgressIndicator(),
+                            builder: (context) => Center(child: AppLoader(size: 24),
                             ),
                           );
                           try {

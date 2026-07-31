@@ -13,6 +13,9 @@ import '../../payments/presentation/screens/payment_screen.dart';
 import '../../chat/presentation/providers/chat_provider.dart';
 import '../../chat/presentation/screens/chat_screen.dart';
 import '../../../core/services/user_behavior_service.dart';
+import '../../notifications/repositories/notification_repository.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class PropertyDetailsScreen extends ConsumerStatefulWidget {
   final PropertyModel property;
@@ -37,6 +40,16 @@ class _PropertyDetailsScreenState
         widget.property.id,
         widget.property.title,
       );
+      
+      // Notify landlord about the view
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && currentUser.uid != widget.property.ownerId) {
+        NotificationRepository().createNotification(
+          userId: widget.property.ownerId,
+          title: 'New Property View',
+          body: 'Someone just viewed your property: ${widget.property.title}',
+        );
+      }
     });
   }
 
@@ -88,23 +101,6 @@ class _PropertyDetailsScreenState
       _snack('Could not launch dialer: $e');
     }
   }
-
-  Future<void> _whatsapp(String number) async {
-    final target = number.trim().isEmpty ? '08030000000' : number.trim();
-    var cleaned = target.replaceAll(RegExp(r'[^\d]'), '');
-    if (cleaned.startsWith('0') && cleaned.length == 11) {
-      cleaned = '234${cleaned.substring(1)}';
-    } else if (!cleaned.startsWith('234') && cleaned.length == 10) {
-      cleaned = '234$cleaned';
-    }
-    final uri = Uri.parse('https://wa.me/$cleaned');
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      _snack('Could not open WhatsApp: $e');
-    }
-  }
-
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -128,7 +124,7 @@ class _PropertyDetailsScreenState
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => Center(child: AppLoader(size: 24)),
     );
 
     try {
@@ -217,6 +213,48 @@ class _PropertyDetailsScreenState
                       p.id, p.title, !wasAlreadyFav);
                 },
               ),
+              if (FirebaseAuth.instance.currentUser?.uid == p.ownerId)
+                IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.8),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.delete_outline, color: Colors.white, size: 20),
+                  ),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Delete Property'),
+                        content: const Text('Are you sure you want to delete this property?'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                          TextButton(
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true) {
+                      try {
+                        await FirebaseFirestore.instance.collection('properties').doc(p.id).delete();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Property deleted')));
+                          Navigator.pop(context);
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+                        }
+                      }
+                    }
+                  },
+                ),
               const SizedBox(width: 8),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -329,6 +367,7 @@ class _PropertyDetailsScreenState
                       const SizedBox(height: 8),
                       InkWell(
                         onTap: () async {
+                          await PermissionService.requestLocationPermission(context);
                           final query = Uri.encodeComponent('${p.address}, ${p.community}, ${p.state}');
                           final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
                           try {
@@ -635,16 +674,6 @@ class _PropertyDetailsScreenState
                               label: 'Call',
                               color: const Color(0xFF10B981),
                               onTap: () => _call(p.contactPhone),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          // WhatsApp
-                          Expanded(
-                            child: _actionButton(
-                              icon: Icons.chat,
-                              label: 'WhatsApp',
-                              color: const Color(0xFF22C55E),
-                              onTap: () => _whatsapp(p.whatsappNumber),
                             ),
                           ),
                         ],
@@ -989,7 +1018,7 @@ class _TenancyAgreementLauncherState
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
+      body: Center(child: AppLoader(size: 24)),
     );
   }
 }
@@ -1094,7 +1123,7 @@ class _EmbeddedTenancyAgreementState extends State<_EmbeddedTenancyAgreement>
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(height: 12),
-                CircularProgressIndicator(color: Color(0xFF0F172A)),
+                AppLoader(size: 24),
                 SizedBox(height: 20),
                 Text(
                   'Generating PDF Agreement...',
@@ -1478,8 +1507,7 @@ class _EmbeddedTenancyAgreementState extends State<_EmbeddedTenancyAgreement>
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
+                        child: AppLoader(size: 24))
                     : const Icon(Icons.verified_rounded, size: 18),
                 label: Text(_saving ? 'Saving...' : 'Sign Agreement'),
                 style: ElevatedButton.styleFrom(

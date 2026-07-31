@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../properties/models/property_model.dart';
 import '../../properties/repositories/property_repository.dart';
 import '../../properties/screens/property_details_screen.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {

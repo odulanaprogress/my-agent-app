@@ -2,7 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/onesignal_api_service.dart';
 import '../../../../core/services/user_behavior_service.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 /// Support & Inquiry screen — lets tenants send messages to the platform
 /// support / agent team. Messages are stored in `support_tickets/{uid}/messages`.
@@ -68,6 +71,15 @@ class _SupportInquiryScreenState extends State<SupportInquiryScreen> {
       await _firestore.collection('support_tickets').doc(_uid).set(ticketData, SetOptions(merge: true));
 
       await UserBehaviorService.logSupportTicket(text);
+
+      try {
+        await OneSignalApiService.notifyAllAdmins(
+          heading: 'New Support Message',
+          content: '${ticketData['userName'] ?? 'A user'}: $text',
+        );
+      } catch (e) {
+        print('Admin push error: $e');
+      }
 
       _msgController.clear();
       _scrollToBottom();
@@ -185,7 +197,7 @@ class _SupportInquiryScreenState extends State<SupportInquiryScreen> {
                         .snapshots(),
                     builder: (context, snap) {
                       if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return Center(child: AppLoader(size: 24));
                       }
 
                       final docs = snap.data?.docs ?? [];
@@ -312,66 +324,87 @@ class _SupportInquiryScreenState extends State<SupportInquiryScreen> {
           ),
 
           // Input bar
-          SafeArea(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Colors.grey.shade100)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: Colors.grey.shade200),
+          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: _firestore.collection('support_tickets').doc(_uid).snapshots(),
+            builder: (context, ticketSnap) {
+              final isClosed = ticketSnap.data?.data()?['status'] == 'closed';
+              
+              if (isClosed) {
+                return SafeArea(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.grey.shade200,
+                    child: const Center(
+                      child: Text(
+                        'This ticket has been closed.',
+                        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
                       ),
-                      child: TextField(
-                        controller: _msgController,
-                        minLines: 1,
-                        maxLines: 4,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          hintText: 'Type your message...',
-                          border: InputBorder.none,
-                          hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                  ),
+                );
+              }
+
+              return SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(top: BorderSide(color: Colors.grey.shade100)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: TextField(
+                            controller: _msgController,
+                            minLines: 1,
+                            maxLines: 4,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: const InputDecoration(
+                              hintText: 'Type your message...',
+                              border: InputBorder.none,
+                              hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                            ),
+                            onSubmitted: (_) => _send(),
+                          ),
                         ),
-                        onSubmitted: (_) => _send(),
                       ),
-                    ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
+                          ),
+                          borderRadius: BorderRadius.circular(23),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(23),
+                            onTap: _sending ? null : _send,
+                            child: _sending
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: AppLoader(size: 24),
+                                  )
+                                : const Icon(Icons.send_rounded,
+                                    color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
-                      ),
-                      borderRadius: BorderRadius.circular(23),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(23),
-                        onTap: _sending ? null : _send,
-                        child: _sending
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Icon(Icons.send_rounded,
-                                color: Colors.white, size: 20),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ],
       ),

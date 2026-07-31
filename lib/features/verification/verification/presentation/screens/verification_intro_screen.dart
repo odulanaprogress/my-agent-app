@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../providers/verification_provider.dart';
 import '../../domain/verification_status.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class VerificationIntroScreen extends ConsumerStatefulWidget {
   const VerificationIntroScreen({super.key});
@@ -34,7 +36,7 @@ class _VerificationIntroScreenState extends ConsumerState<VerificationIntroScree
       });
       return const Scaffold(
         body: Center(
-          child: CircularProgressIndicator(),
+          child: AppLoader(size: 24),
         ),
       );
     }

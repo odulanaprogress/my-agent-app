@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/chat_provider.dart';
 import 'chat_screen.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 
 class ConversationsScreen extends ConsumerWidget {
   const ConversationsScreen({super.key});
@@ -35,7 +36,11 @@ class ConversationsScreen extends ConsumerWidget {
         stream: repo.watchConversationIdsForUser(uid),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 5,
+              itemBuilder: (_, __) => const SkeletonListTile(),
+            );
           }
 
           final ids = snap.data ?? [];
@@ -64,6 +69,11 @@ class ConversationsScreen extends ConsumerWidget {
                     orElse: () => '',
                   );
 
+                  // Guard: skip Firestore query if propertyId is empty
+                  if (propertyId.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
                   return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                     stream: FirebaseFirestore.instance
                         .collection('properties')
@@ -80,6 +90,11 @@ class ConversationsScreen extends ConsumerWidget {
                           (propertyImageList != null && propertyImageList.isNotEmpty
                               ? propertyImageList[0].toString()
                               : '');
+
+                      // Guard: skip user lookup if otherUid is empty
+                      if (otherUid.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
 
                       return StreamBuilder<
                           DocumentSnapshot<Map<String, dynamic>>>(

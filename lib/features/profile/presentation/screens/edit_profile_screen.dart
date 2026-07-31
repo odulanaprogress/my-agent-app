@@ -9,6 +9,8 @@ import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/widgets/custom_button.dart';
 
 import '../providers/profile_provider.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class EditProfileScreen extends ConsumerWidget {
   const EditProfileScreen({super.key});
@@ -87,7 +89,7 @@ class _EditProfileScreenStateImpl
         ),
       ),
       body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Center(child: AppLoader(size: 24)),
         error: (e, _) => Center(child: Text('Failed to load profile: $e')),
         data: (profile) {
           return SafeArea(
@@ -123,7 +125,7 @@ class _EditProfileScreenStateImpl
                     ),
                     const SizedBox(height: 22),
                     if (_isSaving)
-                      const Center(child: CircularProgressIndicator())
+                      Center(child: AppLoader(size: 24))
                     else
                       CustomButton(
                         text: 'Save changes',

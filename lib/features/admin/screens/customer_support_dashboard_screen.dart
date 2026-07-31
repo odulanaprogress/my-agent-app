@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../features/auth/presentation/providers/auth_provider.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class CustomerSupportDashboardScreen extends ConsumerStatefulWidget {
   const CustomerSupportDashboardScreen({super.key});
@@ -172,7 +174,7 @@ class _TicketsTabState extends State<_TicketsTab> {
             stream: query.snapshots(),
             builder: (context, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return Center(child: AppLoader(size: 24));
               }
               final docs = snap.data?.docs ?? [];
               if (docs.isEmpty) {
@@ -585,7 +587,7 @@ class _TicketDetailSheetState extends State<_TicketDetailSheet> {
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: AppLoader(size: 24),
                           )
                         : CircleAvatar(
                             backgroundColor: const Color(0xFF6366F1),
@@ -647,7 +649,7 @@ class _LiveChatsTab extends StatelessWidget {
           .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: AppLoader(size: 24));
         }
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
@@ -894,7 +896,7 @@ class _SupportChatScreenState extends State<_SupportChatScreen> {
                       ? const SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: AppLoader(size: 24),
                         )
                       : CircleAvatar(
                           backgroundColor: const Color(0xFF6366F1),

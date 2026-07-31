@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/permission_service.dart';
 import '../../../../core/widgets/kyc_gate.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class TenancyAgreementScreen extends ConsumerStatefulWidget {
   final String? propertyId;
@@ -91,7 +93,7 @@ class _TenancyAgreementScreenState extends ConsumerState<TenancyAgreementScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(height: 12),
-                CircularProgressIndicator(color: Color(0xFF0F172A)),
+                AppLoader(size: 24),
                 SizedBox(height: 20),
                 Text(
                   'Generating PDF Agreement...',
@@ -574,8 +576,7 @@ class _TenancyAgreementScreenState extends ConsumerState<TenancyAgreementScreen>
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
+                                child: AppLoader(size: 24),
                               )
                             : const Icon(Icons.verified_rounded, size: 18),
                         label:

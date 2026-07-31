@@ -6,6 +6,8 @@ import '../providers/onboarding_provider.dart';
 import '../providers/privacy_provider.dart';
 import '../providers/startup_provider.dart';
 import '../../../../app/routes/route_names.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 /// App entry controller.
 ///
@@ -103,7 +105,7 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
               ),
             ),
             const SizedBox(height: 40),
-            const CircularProgressIndicator(color: Color(0xFF0B3D2E)),
+            AppLoader(size: 24),
           ],
         ),
       ),

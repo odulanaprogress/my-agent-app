@@ -12,6 +12,10 @@
 .swiftpm/
 migrate_working_dir/
 
+# Node dependencies
+node_modules/
+**/node_modules/
+
 # Secret files — NEVER commit these
 .env
 .env.*
@@ -19,6 +23,11 @@ migrate_working_dir/
 web/.env
 google-services.json
 GoogleService-Info.plist
+
+# Firebase user exports — contain real user data (emails, hashes)
+users.json
+*.json.export
+firebase-export-*.json
 
 # IntelliJ related
 *.iml
@@ -38,7 +47,9 @@ GoogleService-Info.plist
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
+build/
 /build/
+**/build/
 /coverage/
 
 # Symbolication related

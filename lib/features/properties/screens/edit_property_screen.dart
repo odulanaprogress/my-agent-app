@@ -8,6 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/services/cloudinary_service.dart';
 import '../models/property_model.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class EditPropertyScreen extends StatefulWidget {
   final PropertyModel property;
@@ -27,7 +29,6 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late final lgaController = TextEditingController(text: widget.property.lga);
   late final communityController = TextEditingController(text: widget.property.community);
   late final phoneController = TextEditingController(text: widget.property.contactPhone);
-  late final whatsappController = TextEditingController(text: widget.property.whatsappNumber);
 
   late String category = widget.property.category;
   late String state = widget.property.state;
@@ -119,7 +120,6 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         'imageUrls': finalImageUrls,
         'videoUrls': finalVideoUrls,
         'contactPhone': phoneController.text.trim(),
-        'whatsappNumber': whatsappController.text.trim(),
         'approvalStatus': 'pending',
         'isApproved': false,
       });
@@ -153,7 +153,6 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     lgaController.dispose();
     communityController.dispose();
     phoneController.dispose();
-    whatsappController.dispose();
     super.dispose();
   }
 
@@ -476,12 +475,6 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
               keyboardType: TextInputType.phone,
               decoration: _inputDec('Phone Number', icon: Icons.phone_outlined),
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: whatsappController,
-              keyboardType: TextInputType.phone,
-              decoration: _inputDec('WhatsApp Number', icon: Icons.chat),
-            ),
 
             const SizedBox(height: 32),
 
@@ -501,7 +494,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                     ? const SizedBox(
                         height: 24,
                         width: 24,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        child: AppLoader(size: 24),
                       )
                     : const Row(
                         mainAxisAlignment: MainAxisAlignment.center,

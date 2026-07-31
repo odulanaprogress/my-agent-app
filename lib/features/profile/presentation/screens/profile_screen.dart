@@ -11,6 +11,8 @@ import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 
 import '../../../auth/presentation/providers/auth_provider.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -37,7 +39,7 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ),
       body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Center(child: AppLoader(size: 24)),
         error: (e, _) => Center(child: Text('Failed to load profile: $e')),
         data: (profile) {
           final name = (profile?['fullName'] ?? '').toString().trim();

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../properties/models/property_model.dart';
 import '../providers/search_provider.dart';
 import '../../../../core/services/user_behavior_service.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -181,6 +182,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
+                  if (controller.items.isEmpty && controller.hasMore)
+                    ...List.generate(3, (_) => const SkeletonCard()),
                 ],
               );
             }

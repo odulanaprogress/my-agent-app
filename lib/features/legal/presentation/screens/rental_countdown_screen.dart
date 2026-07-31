@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 /// Displays a user's active rental/lease with a countdown to expiry.
 class RentalCountdownScreen extends StatelessWidget {
@@ -32,7 +34,7 @@ class RentalCountdownScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           final docs = snap.data?.docs ?? [];

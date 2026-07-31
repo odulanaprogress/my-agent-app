@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'chat_screen.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class ConversationsScreen extends StatelessWidget {
   ConversationsScreen({super.key});
@@ -23,7 +25,7 @@ class ConversationsScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: AppLoader(size: 24));
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {

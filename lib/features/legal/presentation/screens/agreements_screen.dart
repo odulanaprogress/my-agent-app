@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../providers/legal_provider.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
+
 
 class AgreementsScreen extends ConsumerWidget {
   const AgreementsScreen({super.key});
@@ -21,7 +23,7 @@ class AgreementsScreen extends ConsumerWidget {
                   .watchUserLegalDocuments(userId: uid),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: AppLoader(size: 24));
                 }
 
                 final docs = snapshot.data!.docs;

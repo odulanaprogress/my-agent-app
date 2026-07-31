@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:agent_app/core/widgets/app_loader.dart';
 
 import '../../../onboarding/presentation/screens/onboarding_screen.dart';
 
@@ -11,10 +12,22 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+
   @override
   void initState() {
     super.initState();
+    
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+    
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
 
     Timer(const Duration(seconds: 3), () {
       Navigator.pushReplacement(
@@ -23,21 +36,29 @@ class _SplashScreenState extends State<SplashScreen> {
       );
     });
   }
+  
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-
           children: [
-            Image.asset('assets/images/agent_logo.png', height: 120),
-
+            ScaleTransition(
+              scale: _scaleAnimation,
+              child: Image.asset('assets/logos/agent_logo.png', height: 120, errorBuilder: (context, error, stackTrace) {
+                // Fallback if logo path is wrong
+                return Image.asset('assets/images/agent_logo.png', height: 120);
+              }),
+            ),
             const SizedBox(height: 30),
-
             const Text(
               'AGENT',
               style: TextStyle(
@@ -47,17 +68,13 @@ class _SplashScreenState extends State<SplashScreen> {
                 letterSpacing: 3,
               ),
             ),
-
             const SizedBox(height: 10),
-
             const Text(
               'Secure Real Estate Marketplace',
               style: TextStyle(color: Colors.white70, fontSize: 16),
             ),
-
             const SizedBox(height: 50),
-
-            const CircularProgressIndicator(color: Colors.white),
+            const AppLoader(size: 56),
           ],
         ),
       ),

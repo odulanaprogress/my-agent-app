@@ -7,8 +7,9 @@ import '../../../../features/properties/models/property_model.dart';
 import '../../../../core/constants/mock_properties.dart';
 import '../../../favorites/presentation/providers/favorites_notifier.dart';
 import '../../../favorites/presentation/providers/favorites_provider.dart';
+import 'package:shimmer/shimmer.dart';
 
-class FeaturedPropertySection extends ConsumerWidget {
+class FeaturedPropertySection extends ConsumerStatefulWidget {
   final String searchQuery;
   final String? category;
 
@@ -19,7 +20,20 @@ class FeaturedPropertySection extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FeaturedPropertySection> createState() => _FeaturedPropertySectionState();
+}
+
+class _FeaturedPropertySectionState extends ConsumerState<FeaturedPropertySection> {
+  late final Stream<List<PropertyModel>> _propertiesStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _propertiesStream = PropertyService().getApprovedProperties();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
     final favoritesAsync = ref.watch(favoritesIdsProvider);
 
@@ -30,19 +44,25 @@ class FeaturedPropertySection extends ConsumerWidget {
     // mockProperties is imported from lib/core/constants/mock_properties.dart
 
     return StreamBuilder<List<PropertyModel>>(
-      stream: PropertyService().getApprovedProperties(),
+      stream: _propertiesStream,
       builder: (context, snapshot) {
-        // Fallback to beautiful mock properties if database stream is empty or loading
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Column(
+            children: List.generate(3, (index) => _buildShimmerLoader()),
+          );
+        }
+
+        // Fallback to beautiful mock properties if database stream is empty
         final properties = (snapshot.hasData && snapshot.data!.isNotEmpty)
             ? snapshot.data!
             : mockProperties;
 
         final filtered = properties.where((p) {
-          final matchesCategory = category == null ||
-              p.category.toLowerCase() == category!.toLowerCase();
-          final matchesSearch = searchQuery.isEmpty ||
-              p.title.toLowerCase().contains(searchQuery) ||
-              p.location.toLowerCase().contains(searchQuery);
+          final matchesCategory = widget.category == null ||
+              p.category.toLowerCase() == widget.category!.toLowerCase();
+          final matchesSearch = widget.searchQuery.isEmpty ||
+              p.title.toLowerCase().contains(widget.searchQuery) ||
+              p.location.toLowerCase().contains(widget.searchQuery);
           return matchesCategory && matchesSearch;
         }).toList();
 
@@ -311,28 +331,33 @@ class FeaturedPropertySection extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.grey.shade100, width: 1.5),
       ),
-      child: Column(
-        children: [
-          Container(
-            height: 220,
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey.shade200,
+        highlightColor: Colors.white,
+        child: Column(
+          children: [
+            Container(
+              height: 220,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(height: 18, width: 180, color: Colors.grey[100]),
-                const SizedBox(height: 10),
-                Container(height: 14, width: 130, color: Colors.grey[100]),
-              ],
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(height: 18, width: 180, color: Colors.white),
+                  const SizedBox(height: 10),
+                  Container(height: 14, width: 130, color: Colors.white),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
