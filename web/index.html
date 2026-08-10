@@ -73,6 +73,36 @@
     <img src="agent_logo.png" alt="Agent App Logo" class="splash-logo">
     <div class="spinner"></div>
   </div>
+  <script>
+    function removeSplash() {
+      var splash = document.getElementById('loading-splash');
+      if (splash && splash.parentNode) {
+        splash.style.opacity = '0';
+        setTimeout(function() {
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+          }
+        }, 400);
+      }
+    }
+
+    // Listen for Flutter first frame event
+    window.addEventListener('flutter-first-frame', removeSplash);
+
+    // Fallback check if flutter element is mounted in DOM
+    var checkInterval = setInterval(function() {
+      if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || document.querySelector('canvas')) {
+        removeSplash();
+        clearInterval(checkInterval);
+      }
+    }, 200);
+
+    // Safety timeout
+    setTimeout(function() {
+      clearInterval(checkInterval);
+      removeSplash();
+    }, 8000);
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

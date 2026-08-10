@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,24 +22,33 @@ Future<void> main() async {
   // Load environment variables (tolerant for web/dev)
   await dotenv.load(fileName: '.env').catchError((_) {});
 
-  // Initialize OneSignal
-  final oneSignalAppId = dotenv.env['ONESIGNAL_APP_ID'];
-  if (oneSignalAppId != null && oneSignalAppId.isNotEmpty) {
-    OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
-    OneSignal.initialize(oneSignalAppId);
-    // Request notification permission immediately on startup
-    OneSignal.Notifications.requestPermission(true);
+  // Initialize OneSignal (Mobile platforms only)
+  if (!kIsWeb) {
+    final oneSignalAppId = dotenv.env['ONESIGNAL_APP_ID'];
+    if (oneSignalAppId != null && oneSignalAppId.isNotEmpty) {
+      try {
+        OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+        OneSignal.initialize(oneSignalAppId);
+        OneSignal.Notifications.requestPermission(true);
+      } catch (e) {
+        debugPrint('OneSignal initialization error: $e');
+      }
+    }
   }
 
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Initialize Firebase App Check for Bot Protection
-  await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.playIntegrity,
-    appleProvider: AppleProvider.appAttest,
-    webProvider: ReCaptchaV3Provider('YOUR_RECAPTCHA_SITE_KEY'),
-  );
+  try {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.playIntegrity,
+      appleProvider: AppleProvider.appAttest,
+      webProvider: ReCaptchaV3Provider('YOUR_RECAPTCHA_SITE_KEY'),
+    );
+  } catch (e) {
+    debugPrint('Firebase App Check skipped: $e');
+  }
 
   // Use the router-based app so onboarding/privacy/auth routing is active.
   runApp(ProviderScope(child: const AgentApp()));
