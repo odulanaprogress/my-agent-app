@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:agent_app/core/storage/secure_storage_service.dart';
+
+// Conditional import: stub on web, real plugin on mobile
+import 'package:local_auth/local_auth.dart'
+    if (dart.library.html) '../../../../core/stubs/local_auth_stub.dart';
 
 class FingerprintLoginScreen extends StatefulWidget {
   const FingerprintLoginScreen({super.key});
@@ -26,6 +30,13 @@ class _FingerprintLoginScreenState extends State<FingerprintLoginScreen> {
   @override
   void initState() {
     super.initState();
+    if (kIsWeb) {
+      // Biometric auth not supported on web – redirect away immediately
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/login');
+      });
+      return;
+    }
     _isRegistrationMode = FirebaseAuth.instance.currentUser != null;
     _checkBiometrics();
   }
