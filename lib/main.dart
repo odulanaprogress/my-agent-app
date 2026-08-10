@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'app/app.dart';
 
@@ -38,6 +39,10 @@ Future<void> main() async {
 
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  if (kIsWeb) {
+    await FirebaseAuth.instance.setPersistence(Persistence.NONE);
+  }
 
   // Initialize Firebase App Check for Bot Protection
   // Web uses debug provider since no reCAPTCHA site key is configured.
