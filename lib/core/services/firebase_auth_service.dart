@@ -19,9 +19,12 @@ class FirebaseAuthService {
 
   Future<void> _ensureInitialized() async {
     if (_isInitialized) return;
+    if (kIsWeb) {
+      _isInitialized = true;
+      return; // On web, GoogleSignIn uses signInWithPopup — no init needed
+    }
 
     if (_isInitializing) {
-      // Wait for the current init attempt to finish.
       while (_isInitializing) {
         await Future.delayed(const Duration(milliseconds: 100));
       }
@@ -84,25 +87,27 @@ class FirebaseAuthService {
     return credential;
   }
 
-  // ✅ CORRECT implementation for google_sign_in 7.2.0
+  // Google Sign-In — uses popup on web, GoogleSignIn plugin on mobile
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      // Avoid multiple init() calls at runtime.
-      await _ensureInitialized();
+      UserCredential userCredential;
 
-      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-
-      // ✅ CORRECT: authentication is a getter
-      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-
-      // ✅ CORRECT: Only idToken exists in 7.2.0 (NO accessToken!)
-      final credential = GoogleAuthProvider.credential(
-        idToken: googleAuth.idToken,
-        // accessToken does NOT exist in 7.2.0 - DO NOT include it!
-      );
-
-      final UserCredential userCredential = await _firebaseAuth
-          .signInWithCredential(credential);
+      if (kIsWeb) {
+        // On web: use Firebase's built-in Google provider popup
+        final googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        userCredential = await _firebaseAuth.signInWithPopup(googleProvider);
+      } else {
+        // On mobile: use the GoogleSignIn plugin
+        await _ensureInitialized();
+        final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
+        final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+        final credential = GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+        );
+        userCredential = await _firebaseAuth.signInWithCredential(credential);
+      }
 
       // Create Firestore user document if new user
       final userDoc = await _firestore

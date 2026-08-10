@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -38,11 +39,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (user == null) {
         _ref.read(currentUserProvider.notifier).state = null;
         state = state.copyWith(status: AuthStatus.unauthenticated);
-        OneSignal.logout();
+        if (!kIsWeb) OneSignal.logout();
         return;
       }
 
-      OneSignal.login(user.uid);
+      if (!kIsWeb) OneSignal.login(user.uid);
 
       try {
         final cacheService = UserCacheService();
@@ -123,24 +124,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
         
         UserBehaviorService.logLogin(method: 'email_or_google');
 
-        // Link this device to the user's UID in OneSignal
-        OneSignal.login(user.uid);
-
-        // Request notification permissions and await user's choice
-        final granted = await OneSignal.Notifications.requestPermission(true);
-
-        if (granted) {
-          // Welcome back notification
+        // OneSignal & push notifications — mobile only
+        if (!kIsWeb) {
           try {
-            // Delay to allow OneSignal time to link the new device token to the UID
-            await Future.delayed(const Duration(seconds: 4));
-            await OneSignalApiService.sendNotification(
-              receiverUids: [user.uid],
-              heading: 'Welcome Back!',
-              content: 'You have successfully logged in to AGENT.',
-            );
+            OneSignal.login(user.uid);
+            final granted = await OneSignal.Notifications.requestPermission(true);
+            if (granted) {
+              await Future.delayed(const Duration(seconds: 4));
+              await OneSignalApiService.sendNotification(
+                receiverUids: [user.uid],
+                heading: 'Welcome Back!',
+                content: 'You have successfully logged in to AGENT.',
+              );
+            }
           } catch (e) {
-            print('Push notification error: $e');
+            debugPrint('Push notification error: $e');
           }
         }
       } catch (e) {
@@ -159,9 +157,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _authService.signIn(email: email, password: password);
       _failedLoginAttempts = 0;
       
-      final storage = SecureStorageService();
-      await storage.write(key: 'biometric_email', value: email);
-      await storage.write(key: 'biometric_password', value: password);
+      // Save credentials for biometric login — mobile only
+      if (!kIsWeb) {
+        try {
+          final storage = SecureStorageService();
+          await storage.write(key: 'biometric_email', value: email);
+          await storage.write(key: 'biometric_password', value: password);
+        } catch (e) {
+          debugPrint('SecureStorage write error: $e');
+        }
+      }
 
       // Flag so the dashboard can prompt fingerprint registration on first login
       final prefs = await SharedPreferences.getInstance();
@@ -203,9 +208,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         privacyAccepted: privacyAccepted,
       );
       
-      final storage = SecureStorageService();
-      await storage.write(key: 'biometric_email', value: email);
-      await storage.write(key: 'biometric_password', value: password);
+      if (!kIsWeb) {
+        try {
+          final storage = SecureStorageService();
+          await storage.write(key: 'biometric_email', value: email);
+          await storage.write(key: 'biometric_password', value: password);
+        } catch (e) {
+          debugPrint('SecureStorage write error: $e');
+        }
+      }
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
     } catch (e) {
@@ -220,7 +231,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Ignored to ensure logout proceeds even if offline
     }
     await UserCacheService().clearCache();
-    OneSignal.logout();
+    if (!kIsWeb) OneSignal.logout();
     await _authService.signOut();
   }
 
