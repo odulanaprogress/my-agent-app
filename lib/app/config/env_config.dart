@@ -28,4 +28,21 @@ class EnvConfig {
   static String get cloudinaryUploadPreset =>
       dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ??
       const String.fromEnvironment('CLOUDINARY_UPLOAD_PRESET');
+
+  // =====================
+  // FLUTTERWAVE
+  // =====================
+
+  static String get flutterwavePublicKey =>
+      dotenv.env['FLUTTERWAVE_PUBLIC_KEY'] ??
+      const String.fromEnvironment('FLUTTERWAVE_PUBLIC_KEY');
+
+  static String get flutterwaveSecretKey =>
+      dotenv.env['FLUTTERWAVE_SECRET_KEY'] ??
+      const String.fromEnvironment('FLUTTERWAVE_SECRET_KEY');
+
+  static String get flutterwaveEncryptionKey =>
+      dotenv.env['FLUTTERWAVE_ENCRYPTION_KEY'] ??
+      const String.fromEnvironment('FLUTTERWAVE_ENCRYPTION_KEY');
 }
+

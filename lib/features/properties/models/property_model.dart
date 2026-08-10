@@ -24,6 +24,7 @@ class PropertyModel {
 
   final String approvalStatus; // pending | approved | rejected
   final bool isApproved;
+  final bool isRented;
 
   final int viewsCount;
   final int favoritesCount;
@@ -61,6 +62,7 @@ class PropertyModel {
     required this.contactPhone,
     required this.approvalStatus,
     required this.isApproved,
+    this.isRented = false,
     required this.viewsCount,
     required this.favoritesCount,
     required this.inquiriesCount,
@@ -151,6 +153,7 @@ class PropertyModel {
       // Legacy compatibility
       approvalStatus: map['approvalStatus'] ?? 'pending',
       isApproved: map['isApproved'] == true || map['isApproved'] == 1,
+      isRented: map['isRented'] == true || map['isAvailable'] == false,
       viewsCount: parseInt(map['viewsCount'] ?? 0),
       favoritesCount: parseInt(map['favoritesCount'] ?? 0),
       inquiriesCount: parseInt(map['inquiriesCount'] ?? 0),

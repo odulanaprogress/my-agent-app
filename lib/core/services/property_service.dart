@@ -40,6 +40,7 @@ class PropertyService {
         .map(
           (snapshot) => snapshot.docs
               .map((doc) => PropertyModel.fromMap(doc.data(), doc.id))
+              .where((p) => !p.isRented)
               .toList()
                 ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
         );

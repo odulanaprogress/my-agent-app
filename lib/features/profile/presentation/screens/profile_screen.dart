@@ -90,6 +90,14 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
 
                 SettingsTile(
+                  icon: Icons.account_balance_wallet_rounded,
+                  title: 'My Wallet & Escrow Transactions',
+                  subtitle: 'View active escrows, PIN codes & receipts',
+                  onTap: () => context.push('/wallet'),
+                ),
+                const SizedBox(height: 10),
+
+                SettingsTile(
                   icon: Icons.settings,
                   title: 'Settings',
                   subtitle: 'Privacy, verification and security',

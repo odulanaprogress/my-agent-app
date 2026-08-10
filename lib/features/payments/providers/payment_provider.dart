@@ -127,6 +127,11 @@ class PaymentController {
     required String propertyId,
     required int amount,
     String? transactionId,
+    EscrowStatus status = EscrowStatus.pending,
+    String? virtualAccountNumber,
+    String? virtualBankName,
+    String? virtualAccountName,
+    String? txRef,
   }) async {
     final tenant = ref.read(currentUserProvider);
     if (tenant == null) {
@@ -137,19 +142,25 @@ class PaymentController {
         transactionId ??
         FirebaseFirestore.instance.collection('transactions').doc().id;
 
-    // SECURITY NOTE: This demo provider does not deduct/hold funds yet.
-    // We create the transaction and mark it as `held`.
     await paymentRepository.createEscrowTransaction(
       transactionId: id,
       tenantId: tenant.uid,
       landlordId: landlordId,
       propertyId: propertyId,
       amount: amount,
-      status: EscrowStatus.held,
+      status: status,
       createdAt: DateTime.now(),
+      virtualAccountNumber: virtualAccountNumber,
+      virtualBankName: virtualBankName,
+      virtualAccountName: virtualAccountName,
+      txRef: txRef,
     );
 
     return id;
+  }
+
+  Future<bool> verifyPaymentTransfer({required String transactionId}) async {
+    return await paymentRepository.verifyPaymentTransfer(transactionId: transactionId);
   }
 
   Future<void> confirmPossession({required String transactionId}) async {
@@ -161,6 +172,19 @@ class PaymentController {
     );
   }
 
+
+  Future<Map<String, dynamic>> verifyEscrowPin({
+    required String transactionId,
+    required String pin,
+    required String role,
+  }) async {
+    return await paymentRepository.verifyEscrowPin(
+      transactionId: transactionId,
+      pin: pin,
+      role: role,
+    );
+  }
+
   Future<void> requestRefund({required String transactionId}) async {
     await paymentRepository.transitionEscrowStatus(
       transactionId: transactionId,
@@ -168,6 +192,7 @@ class PaymentController {
       to: EscrowStatus.refunded,
     );
   }
+
 }
 
 final _paymentStateProvider = StateProvider<PaymentState>(

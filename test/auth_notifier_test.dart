@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agent_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:agent_app/core/services/firebase_auth_service.dart';
 import 'package:agent_app/core/services/user_firestore_service.dart';
@@ -60,6 +61,8 @@ class MockUserFirestoreService implements UserFirestoreService {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
   test('AuthNotifier logout sets status to unauthenticated and calls signOut', () async {
     final mockAuth = MockFirebaseAuthService();
     final mockFirestore = MockUserFirestoreService();

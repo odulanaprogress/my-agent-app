@@ -23,6 +23,7 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../../features/chat/presentation/screens/conversations_screen.dart';
 import '../../features/payments/presentation/screens/wallet_screen.dart';
+import '../../features/payments/presentation/screens/escrow_details_screen.dart';
 
 import '../../features/admin/screens/admin_analytics_screen.dart';
 import '../../features/admin/screens/admin_property_approval_screen.dart';
@@ -65,6 +66,7 @@ const _protectedPaths = {
   '/edit-profile',
   '/conversations',
   '/wallet',
+  '/escrow',
   '/notifications',
   '/search',
   '/search/favorites',
@@ -240,6 +242,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/wallet',
         builder: (context, state) => const WalletScreen(),
+      ),
+      GoRoute(
+        path: '/escrow',
+        builder: (context, state) {
+          final txId = (state.extra as String?) ?? (state.uri.queryParameters['id'] ?? '');
+          return EscrowDetailsScreen(transactionId: txId);
+        },
       ),
 
       // Verification flow

@@ -11,9 +11,12 @@ final notificationsStreamProvider = StreamProvider<List<NotificationModel>>((ref
   return FirebaseFirestore.instance
       .collection('notifications')
       .where('userId', isEqualTo: user.uid)
-      .orderBy('createdAt', descending: true)
       .snapshots()
-      .map((snapshot) => snapshot.docs.map((doc) => NotificationModel.fromMap(doc.data(), doc.id)).toList());
+      .map((snapshot) {
+        final list = snapshot.docs.map((doc) => NotificationModel.fromMap(doc.data(), doc.id)).toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
+      });
 });
 
 class GlobalNotificationListener extends ConsumerStatefulWidget {

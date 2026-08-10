@@ -6,38 +6,45 @@ class NotificationRepository {
   NotificationRepository({FirebaseFirestore? firestore})
     : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  CollectionReference<Map<String, dynamic>> userNotifications({
-    required String uid,
-  }) {
-    return _firestore
-        .collection('notifications')
-        .doc(uid)
-        .collection('userNotifications');
-  }
+  CollectionReference<Map<String, dynamic>> get _notificationsCollection =>
+      _firestore.collection('notifications');
 
   Stream<List<NotificationItem>> watchUserNotifications({
     required String uid,
     int limit = 20,
   }) {
-    return userNotifications(uid: uid)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
+    return _notificationsCollection
+        .where('userId', isEqualTo: uid)
         .snapshots()
-        .map(
-          (snap) => snap.docs.map((d) {
-            final data = d.data();
-            return NotificationItem.fromMap(data, d.id);
-          }).toList(),
-        );
+        .map((snap) {
+      final list = snap.docs.map((d) {
+        final data = d.data();
+        return NotificationItem.fromMap(data, d.id);
+      }).toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      if (list.length > limit) {
+        return list.sublist(0, limit);
+      }
+      return list;
+    });
   }
 
   Future<void> markAsRead({
     required String uid,
     required String notificationId,
   }) async {
-    await userNotifications(
-      uid: uid,
-    ).doc(notificationId).update({'isRead': true});
+    try {
+      await _notificationsCollection.doc(notificationId).update({'isRead': true});
+    } catch (_) {
+      try {
+        await _firestore
+            .collection('notifications')
+            .doc(uid)
+            .collection('userNotifications')
+            .doc(notificationId)
+            .update({'isRead': true});
+      } catch (_) {}
+    }
   }
 
   Future<void> addNotification({
@@ -47,9 +54,11 @@ class NotificationRepository {
     required String type,
     required String targetId,
   }) async {
-    await userNotifications(uid: uid).add({
+    await _notificationsCollection.add({
+      'userId': uid,
       'title': title,
       'message': message,
+      'body': message,
       'type': type,
       'isRead': false,
       'targetId': targetId,
@@ -94,8 +103,8 @@ class NotificationItem {
     return NotificationItem(
       id: id,
       title: map['title']?.toString() ?? '',
-      message: map['message']?.toString() ?? '',
-      type: map['type']?.toString() ?? '',
+      message: (map['message'] ?? map['body'])?.toString() ?? '',
+      type: map['type']?.toString() ?? 'info',
       isRead: (map['isRead'] == true) || (map['isRead'] == 1),
       targetId: map['targetId']?.toString() ?? '',
       createdAt: _parseDate(map['createdAt']),
