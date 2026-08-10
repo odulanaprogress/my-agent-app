@@ -46,10 +46,10 @@ firebase-export-*.json
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
-.pub/
-build/
-/build/
-**/build/
+build/*
+!build/web/
+android/build/
+ios/build/
 /coverage/
 
 # Symbolication related
