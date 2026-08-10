@@ -103,15 +103,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
           }
         }
 
-        // If user doc is missing, keep UX responsive and fall back to an unauthenticated state.
-        // This prevents the gate from getting stuck in loading.
+        // If user doc is missing, auto-create a basic profile so the user
+        // isn't stuck in a loading/error loop. They can update it later.
         if (profile == null && cachedProfile == null) {
-          _ref.read(currentUserProvider.notifier).state = null;
-          state = state.copyWith(
-            status: AuthStatus.error,
-            errorMessage: 'User profile not found',
+          debugPrint('[AuthNotifier] No profile found for ${user.uid} — auto-creating.');
+          final autoProfile = UserModel(
+            uid: user.uid,
+            email: user.email ?? '',
+            fullName: user.displayName ?? user.email?.split('@').first ?? 'User',
+            role: 'tenant', // safe default; role-selection screen can update this
+            isVerified: user.emailVerified,
+            privacyAccepted: true,
+            onboardingCompleted: false,
+            createdAt: DateTime.now(),
           );
-          return;
+          try {
+            await _userFirestoreService.createUserProfile(autoProfile);
+            profile = autoProfile;
+          } catch (e) {
+            debugPrint('[AuthNotifier] Failed to auto-create profile: $e');
+            // Still set the in-memory profile so they can at least see the app
+            _ref.read(currentUserProvider.notifier).state = autoProfile;
+            state = state.copyWith(status: AuthStatus.authenticated);
+            return;
+          }
         }
 
         if (profile != null) {

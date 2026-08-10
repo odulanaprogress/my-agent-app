@@ -40,13 +40,19 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Initialize Firebase App Check for Bot Protection
+  // Web uses debug provider since no reCAPTCHA site key is configured.
+  // To use reCAPTCHA: replace ReCaptchaEnterpriseProvider with your real key.
   try {
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.playIntegrity,
       appleProvider: AppleProvider.appAttest,
-      webProvider: ReCaptchaV3Provider('YOUR_RECAPTCHA_SITE_KEY'),
+      webProvider: ReCaptchaEnterpriseProvider(
+        dotenv.env['RECAPTCHA_SITE_KEY'] ?? '',
+      ),
     );
   } catch (e) {
+    // App Check failure must never block the app from running.
+    // Firebase Auth & Firestore will still work (unenforced mode).
     debugPrint('Firebase App Check skipped: $e');
   }
 
