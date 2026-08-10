@@ -216,7 +216,7 @@ class PaymentRepository {
         updates['payoutAt'] = Timestamp.now();
 
         // Trigger Flutterwave Escrow Settlement API (/transactions/escrow/settle)
-        final netPayout = data['netPayoutAmount'] ?? 0;
+        final netPayout = data['netPayoutAmount'] ?? data['amount'] ?? 0;
         final netPayoutInt = netPayout is int ? netPayout : (netPayout as num).toInt();
         _apiService.settleFlutterwaveEscrow(
           transactionId: transactionId,

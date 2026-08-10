@@ -1083,6 +1083,16 @@ class EscrowDetailsScreen extends ConsumerWidget {
                                   bankCode: selectedBankCode,
                                   accountNumber: acct,
                                 );
+
+                                // Deduct balance in Firestore
+                                if (currentUser != null) {
+                                  await ref.read(walletRepositoryProvider).incrementBalance(
+                                    uid: currentUser.uid,
+                                    delta: -tx.netPayoutAmount,
+                                    updatedAt: DateTime.now(),
+                                  );
+                                }
+
                                 Navigator.pop(modalCtx);
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(

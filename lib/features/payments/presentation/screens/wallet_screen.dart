@@ -439,6 +439,55 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             : null,
         actions: [
           IconButton(
+            onPressed: () async {
+              if (user == null) return;
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Sync Wallet Balance'),
+                  content: const Text('Is your wallet balance not reflecting your released escrow payments? Click Sync to recalculate it from your completed transactions.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                    ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sync Balance')),
+                  ],
+                ),
+              );
+              if (confirm != true) return;
+
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Syncing wallet...')));
+                final txs = await FirebaseFirestore.instance.collection('transactions')
+                    .where('landlordId', isEqualTo: user.uid)
+                    .get();
+                
+                int totalReleased = 0;
+                for (var doc in txs.docs) {
+                  final data = doc.data();
+                  if (data['status'] == 'released' || data['status'] == 'completed') {
+                    final amt = data['netPayoutAmount'] ?? data['amount'] ?? 0;
+                    totalReleased += (amt as num).toInt();
+                  }
+                }
+
+                await FirebaseFirestore.instance.collection('wallets').doc(user.uid).set({
+                  'availableBalance': totalReleased,
+                  'balance': totalReleased,
+                  'updatedAt': Timestamp.now(),
+                }, SetOptions(merge: true));
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Wallet Synced Successfully!')));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            icon: const Icon(Icons.sync_rounded, color: Color(0xFF0F172A)),
+            tooltip: 'Sync Wallet Balance',
+          ),
+          IconButton(
             icon: const Icon(Icons.history_rounded, color: Color(0xFF0F172A)),
             tooltip: 'Transaction History',
             onPressed: () {},
