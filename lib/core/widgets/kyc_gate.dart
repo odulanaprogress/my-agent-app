@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/verification/verification/providers/verification_provider.dart';
 import '../../features/verification/verification/domain/verification_status.dart';
+import '../../features/auth/presentation/providers/current_user_provider.dart';
 
 /// Reusable KYC gate.
 ///
@@ -14,19 +15,29 @@ class KycGate {
   KycGate._();
 
   static Future<bool> require(BuildContext context, WidgetRef ref) async {
-    final state = ref.read(verificationStateProvider);
+    // ── 1. Check the user profile's isVerified flag first (always loaded) ──
+    final user = ref.read(currentUserProvider);
+    if (user != null && user.isVerified == true) return true;
 
-    if (state.status == VerificationStatus.approved) return true;
+    // ── 2. Refresh verification doc from Firestore to get latest status ──
+    await ref.read(verificationControllerProvider).refresh();
 
+    // ── 3. Re-check after the fresh Firestore load ──
+    final freshState = ref.read(verificationStateProvider);
+    if (freshState.status == VerificationStatus.approved) return true;
+
+    // ── 4. Still not verified — show the bottom sheet ──
+    if (!context.mounted) return false;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _KycGateSheet(status: state.status),
+      builder: (_) => _KycGateSheet(status: freshState.status),
     );
     return false;
   }
 }
+
 
 class _KycGateSheet extends StatelessWidget {
   final VerificationStatus status;
