@@ -318,8 +318,9 @@ class EscrowApiService {
 
     try {
       if (kIsWeb) {
-        // WEB: Route through Vercel Serverless Function (/api/bank/resolve) to bypass CORS
-        final Uri url = Uri.base.resolve('/api/bank/resolve');
+        // WEB: Route through Vercel Serverless Function to bypass CORS
+        // Hardcoded to absolute URL so it works even when testing locally via 'flutter run'
+        final Uri url = Uri.parse('https://my-agent-app-teal.vercel.app/api/bank/resolve');
         final response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
