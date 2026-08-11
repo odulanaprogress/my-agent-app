@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import '../network/api_client.dart';
 import '../../app/config/env_config.dart';
@@ -305,12 +306,16 @@ class EscrowApiService {
     }
   }
 
-  /// Resolve Nigerian Bank Account Name via Node Backend (Proxy to Flutterwave /v3/accounts/resolve)
-  /// This bypasses Web CORS issues and uses the backend's secret key.
+  /// Resolve Nigerian Bank Account Name (Handles both Web CORS proxy and Mobile direct)
   Future<Map<String, dynamic>> resolveAccountName({
     required String accountNumber,
     required String bankCode,
   }) async {
+    final secretKey = EnvConfig.flutterwaveSecretKey;
+    if (secretKey.isEmpty) {
+      throw AppException('Flutterwave Secret Key is not configured.');
+    }
+    
     String resolveBankCode = bankCode.trim();
     
     // A robust mapping for Live Flutterwave Name Resolution for Fintechs (NIP codes):
@@ -323,18 +328,6 @@ class EscrowApiService {
     }
 
     try {
-      final res = await ApiClient.post('/bank/resolve', {
-        'accountNumber': accountNumber.trim(),
-        'bankCode': resolveBankCode,
-      });
-
-      if (res['success'] == true && res['data'] != null) {
-        // Mock the response format to match what the UI previously expected from Flutterwave directly
-        return {
-          'status': 'success',
-          'data': {
-            'account_name': res['data']['accountName'],
-            'account_number': res['data']['accountNumber'],
           }
         };
       }
