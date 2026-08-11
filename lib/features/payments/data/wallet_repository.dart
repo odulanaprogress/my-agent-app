@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../core/utils/app_exception.dart';
 
 class WalletData {
   final int availableBalance;
@@ -104,7 +105,7 @@ class WalletRepository {
       final currentAvail = (data['availableBalance'] ?? data['balance'] as num?)?.toInt() ?? 0;
       final currentEscrow = (data['escrowBalance'] as num?)?.toInt() ?? 0;
 
-      if (currentAvail < amount) throw StateError('Insufficient available balance');
+      if (currentAvail < amount) throw AppException('Insufficient available balance');
 
       tx.set(ref, {
         'uid': uid,

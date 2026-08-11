@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../network/api_client.dart';
 import '../../app/config/env_config.dart';
+import '../utils/app_exception.dart';
 
 class EscrowApiService {
   /// Verify 6-Digit Escrow Handshake PIN via Backend REST API
@@ -311,7 +312,7 @@ class EscrowApiService {
   }) async {
     final secretKey = EnvConfig.flutterwaveSecretKey;
     if (secretKey.isEmpty) {
-      throw StateError('Flutterwave Secret Key is not configured.');
+      throw AppException('Flutterwave Secret Key is not configured.');
     }
     final Uri url = Uri.parse('https://api.flutterwave.com/v3/accounts/resolve');
     final response = await http.post(
@@ -330,7 +331,7 @@ class EscrowApiService {
       return body;
     } else {
       final msg = body['message'] ?? 'Unable to resolve account number for selected bank.';
-      throw StateError(msg.toString());
+      throw AppException(msg.toString());
     }
   }
 
@@ -344,7 +345,7 @@ class EscrowApiService {
   }) async {
     final secretKey = EnvConfig.flutterwaveSecretKey;
     if (secretKey.isEmpty) {
-      throw StateError('Flutterwave Secret Key is not configured.');
+      throw AppException('Flutterwave Secret Key is not configured.');
     }
     final Uri url = Uri.parse('https://api.flutterwave.com/v3/transfers');
     final response = await http.post(
@@ -370,7 +371,7 @@ class EscrowApiService {
       if (msg.toLowerCase().contains('ip whitelisting')) {
         msg = 'Flutterwave Security Lock: Please go to Flutterwave Dashboard -> Settings -> Security and turn OFF "IP Whitelisting for Transfers" (or whitelist your server IP address).';
       }
-      throw StateError(msg);
+      throw AppException(msg);
     }
   }
 }

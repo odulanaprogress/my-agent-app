@@ -14,6 +14,7 @@ import 'package:agent_app/core/services/escrow_api_service.dart';
 import '../../../legal/presentation/screens/tenancy_agreement_screen.dart';
 
 import '../widgets/payment_receipt_dialog.dart';
+import 'package:agent_app/core/utils/app_exception.dart';
 
 class EscrowDetailsScreen extends ConsumerWidget {
   const EscrowDetailsScreen({super.key, required this.transactionId});
@@ -177,7 +178,7 @@ class EscrowDetailsScreen extends ConsumerWidget {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     backgroundColor: Colors.redAccent,
-                                    content: Text(e.toString().replaceAll('Exception:', '').replaceAll('StateError:', '').trim()),
+                                    content: Text(extractErrorMessage(e)),
                                   ),
                                 );
                               }
@@ -831,6 +832,7 @@ class EscrowDetailsScreen extends ConsumerWidget {
   }
 
   void _showLandlordPayoutBankSheet(BuildContext context, WidgetRef ref, TransactionModel tx) {
+    final currentUser = ref.read(currentUserProvider);
     final accountController = TextEditingController();
     String selectedBankCode = '058';
     String selectedBankName = 'Guaranty Trust Bank (GTBank)';
@@ -894,9 +896,18 @@ class EscrowDetailsScreen extends ConsumerWidget {
                   resolvedAccountName = name.toString();
                 });
               } catch (e) {
+                final msg = extractErrorMessage(e);
+                final isCors = msg.toLowerCase().contains('cors') ||
+                    msg.toLowerCase().contains('xmlhttprequest') ||
+                    msg.toLowerCase().contains('failed to fetch') ||
+                    msg.toLowerCase().contains('network') ||
+                    msg.contains('minified') ||
+                    msg.startsWith('Instance of ');
                 setModalState(() {
                   isResolving = false;
-                  resolveError = e.toString().replaceAll('Exception: ', '').replaceAll('StateError: ', '').trim();
+                  resolveError = isCors
+                      ? 'Account name lookup unavailable on web. Please verify the number manually before proceeding.'
+                      : msg;
                 });
               }
             }
@@ -1103,7 +1114,7 @@ class EscrowDetailsScreen extends ConsumerWidget {
                                   );
                                 }
                               } catch (e) {
-                                final errStr = e.toString().replaceAll('Exception: ', '').replaceAll('StateError: ', '').trim();
+                                final errStr = extractErrorMessage(e);
                                 setModalState(() {
                                   isProcessing = false;
                                   transferError = errStr;

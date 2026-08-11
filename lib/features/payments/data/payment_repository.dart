@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
 
 import '../../../core/services/escrow_api_service.dart';
+import '../../../core/utils/app_exception.dart';
 
 class PaymentRepository {
   PaymentRepository(this._firestore, [EscrowApiService? apiService])
@@ -88,7 +89,7 @@ class PaymentRepository {
     final ref = _txCollection.doc(transactionId);
     final snap = await ref.get();
     if (!snap.exists) {
-      throw StateError('Transaction not found');
+      throw AppException('Transaction not found');
     }
 
     final data = snap.data()!;
@@ -103,7 +104,7 @@ class PaymentRepository {
     );
 
     if (!verified) {
-      throw StateError('Flutterwave could not confirm payment transfer yet. Please try again.');
+      throw AppException('Flutterwave could not confirm payment transfer yet. Please try again.');
     }
 
     final now = Timestamp.now();
@@ -121,7 +122,7 @@ class PaymentRepository {
           'updatedAt': now,
         }, SetOptions(merge: true));
       } catch (e) {
-        throw StateError('Permission denied when updating transaction status in Firestore. Please ensure rules allow transaction updates.');
+        throw AppException('Permission denied when updating transaction status in Firestore. Please ensure rules allow transaction updates.');
       }
     }
 
@@ -187,17 +188,17 @@ class PaymentRepository {
       if (role == 'tenant') {
         // Tenant enters Landlord's PIN
         if (landlordPin == null || cleanPin != landlordPin) {
-          throw StateError('Invalid Handover PIN entered. Please verify with the Landlord.');
+          throw AppException('Invalid Handover PIN entered. Please verify with the Landlord.');
         }
         tenantPinVerified = true;
       } else if (role == 'landlord') {
         // Landlord enters Tenant's PIN
         if (tenantPin == null || cleanPin != tenantPin) {
-          throw StateError('Invalid Key Receipt PIN entered. Please verify with the Tenant.');
+          throw AppException('Invalid Key Receipt PIN entered. Please verify with the Tenant.');
         }
         landlordPinVerified = true;
       } else {
-        throw StateError('Invalid user role');
+        throw AppException('Invalid user role');
       }
 
       final bool bothVerified = tenantPinVerified && landlordPinVerified;
@@ -382,7 +383,7 @@ class PaymentRepository {
         (data['status'] ?? 'pending').toString(),
       );
       if (current != from) {
-        throw StateError(
+        throw AppException(
           'Invalid status transition: $current -> $to (expected from: $from)',
         );
       }

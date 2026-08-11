@@ -12,6 +12,7 @@ import '../../../../../core/widgets/kyc_gate.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/services/escrow_api_service.dart';
+import '../../../../core/utils/app_exception.dart';
 
 
 // Real-time wallet data provider
@@ -143,9 +144,20 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 resolvedAccountName = name.toString();
               });
             } catch (e) {
+              final msg = extractErrorMessage(e);
+              // On web, Flutterwave API is blocked by CORS — show soft warning
+              // so users can still proceed without name verification.
+              final isCors = msg.toLowerCase().contains('cors') ||
+                  msg.toLowerCase().contains('xmlhttprequest') ||
+                  msg.toLowerCase().contains('failed to fetch') ||
+                  msg.toLowerCase().contains('network') ||
+                  msg.contains('minified') ||
+                  msg.startsWith('Instance of ');
               setModalState(() {
                 isResolving = false;
-                resolveError = e.toString().replaceAll('Exception: ', '').replaceAll('StateError: ', '').trim();
+                resolveError = isCors
+                    ? 'Account name lookup unavailable on web. Please verify the number manually before proceeding.'
+                    : msg;
               });
             }
           }
@@ -372,7 +384,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                                   _snack('🎉 ₦$amt withdrawal sent to $acct (${resolvedAccountName ?? selectedBankName}) via Flutterwave!');
                                 }
                               } catch (e) {
-                                final errStr = e.toString().replaceAll('Exception: ', '').replaceAll('StateError: ', '').trim();
+                                final errStr = extractErrorMessage(e);
                                 setModalState(() {
                                   isProcessing = false;
                                   transferError = errStr;
@@ -440,7 +452,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
         actions: [
           IconButton(
             onPressed: () async {
-              if (user == null) return;
+              if (currentUser == null) return;
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -457,7 +469,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               try {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Syncing wallet...')));
                 final txs = await FirebaseFirestore.instance.collection('transactions')
-                    .where('landlordId', isEqualTo: user.uid)
+                    .where('landlordId', isEqualTo: currentUser!.uid)
                     .get();
                 
                 int totalReleased = 0;
@@ -469,7 +481,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   }
                 }
 
-                await FirebaseFirestore.instance.collection('wallets').doc(user.uid).set({
+                await FirebaseFirestore.instance.collection('wallets').doc(currentUser!.uid).set({
                   'availableBalance': totalReleased,
                   'balance': totalReleased,
                   'updatedAt': Timestamp.now(),
@@ -480,7 +492,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${extractErrorMessage(e)}')));
                 }
               }
             },
