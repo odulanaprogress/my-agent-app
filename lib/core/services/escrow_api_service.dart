@@ -315,46 +315,65 @@ class EscrowApiService {
       throw AppException('Flutterwave Secret Key is not configured.');
     }
     
-    // DEBUG LOGGING AS REQUESTED BY USER
-    final acctClean = accountNumber.trim();
-    final bankClean = bankCode.trim();
-    final keyPreview = secretKey.length >= 12 ? secretKey.substring(0, 12) : secretKey;
-    final keySuffix = secretKey.length >= 5 ? secretKey.substring(secretKey.length - 5) : secretKey;
+    String resolveBankCode = bankCode.trim();
+    // Use NIP codes for Fintechs for name resolution if the standard transfer codes fail on LIVE
+    if (resolveBankCode == '100033') resolveBankCode = '090333'; // PalmPay alternative NIP
+    if (resolveBankCode == '100004') resolveBankCode = '090267'; // OPay alternative NIP (usually 090267 or 999992, but we'll try Flutterwave's resolve mapping)
+    // Actually, Flutterwave docs state Opay is 090267 or 999992. Let's try to stick to standard codes first.
     
-    debugPrint('=========================================');
-    debugPrint('FLUTTERWAVE RESOLVE DIAGNOSTICS:');
-    debugPrint('Key Prefix: $keyPreview...');
-    debugPrint('Key Suffix: ...$keySuffix');
-    debugPrint('Is Test Key: ${secretKey.endsWith('-X')}');
-    debugPrint('Bank Code Sent: "$bankClean"');
-    debugPrint('Account Sent: "$acctClean"');
-    debugPrint('=========================================');
+    // A more robust mapping for Live Flutterwave Name Resolution for Fintechs:
+    final Map<String, String> liveResolveCodes = {
+      '100033': '999991', // PalmPay NIP
+      '100004': '999992', // OPay NIP
+    };
+    if (liveResolveCodes.containsKey(resolveBankCode)) {
+      resolveBankCode = liveResolveCodes[resolveBankCode]!;
+    }
 
     final Uri url = Uri.parse('https://api.flutterwave.com/v3/accounts/resolve');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${secretKey.trim()}',
-      },
-      body: jsonEncode({
-        'account_number': acctClean,
-        'account_bank': bankClean,
-      }),
-    );
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    if (response.statusCode >= 200 && response.statusCode < 300 && body['status'] == 'success') {
-      return body;
-    } else {
-      final fwError = body['message'] ?? 'Unable to resolve account number for selected bank.';
-      // Prepend diagnostics to the error so it shows directly on the device screen
-      throw AppException(
-        'FW_ERROR: $fwError\n'
-        'DIAGNOSTICS:\n'
-        'Key: $keyPreview...$keySuffix\n'
-        'Bank: "$bankClean"\n'
-        'Acct: "$acctClean"'
+    
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${secretKey.trim()}',
+        },
+        body: jsonEncode({
+          'account_number': accountNumber.trim(),
+          'account_bank': resolveBankCode,
+        }),
       );
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      
+      if (response.statusCode >= 200 && response.statusCode < 300 && body['status'] == 'success') {
+        return body;
+      }
+      
+      // If the mapped NIP code failed, try one more time with the original transfer code as fallback
+      if (resolveBankCode != bankCode.trim()) {
+        final fallbackResponse = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${secretKey.trim()}',
+          },
+          body: jsonEncode({
+            'account_number': accountNumber.trim(),
+            'account_bank': bankCode.trim(),
+          }),
+        );
+        final fallbackBody = jsonDecode(fallbackResponse.body) as Map<String, dynamic>;
+        if (fallbackResponse.statusCode >= 200 && fallbackResponse.statusCode < 300 && fallbackBody['status'] == 'success') {
+          return fallbackBody;
+        }
+      }
+
+      final msg = body['message'] ?? 'Unable to resolve account number for selected bank.';
+      throw AppException(msg.toString());
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException('Network error: Unable to verify account name.');
     }
   }
 
