@@ -13,6 +13,7 @@ import 'package:agent_app/core/widgets/app_loader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/services/escrow_api_service.dart';
 import '../../../../core/utils/app_exception.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 
 
 // Real-time wallet data provider
@@ -34,6 +35,53 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   final amountController = TextEditingController(text: '10000');
   bool _isProcessingDeposit = false;
   bool _isProcessingWithdraw = false;
+  bool _hasSynced = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-sync wallet balance after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoSyncIfNeeded());
+  }
+
+  Future<void> _autoSyncIfNeeded() async {
+    if (_hasSynced) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final walletSnap = await FirebaseFirestore.instance.collection('wallets').doc(uid).get();
+      final avail = (walletSnap.data()?['availableBalance'] ?? walletSnap.data()?['balance'] ?? 0);
+      final balance = avail is num ? avail.toInt() : 0;
+
+      // Only sync if balance appears to be 0 — avoids overwriting real balances
+      if (balance == 0) {
+        final txs = await FirebaseFirestore.instance
+            .collection('transactions')
+            .where('landlordId', isEqualTo: uid)
+            .get();
+
+        int totalReleased = 0;
+        for (final doc in txs.docs) {
+          final data = doc.data();
+          final status = data['status']?.toString() ?? '';
+          if (status == 'released' || status == 'completed') {
+            final amt = data['netPayoutAmount'] ?? data['amount'] ?? 0;
+            totalReleased += (amt as num).toInt();
+          }
+        }
+
+        if (totalReleased > 0) {
+          await FirebaseFirestore.instance.collection('wallets').doc(uid).set({
+            'availableBalance': totalReleased,
+            'balance': totalReleased,
+            'uid': uid,
+            'updatedAt': Timestamp.now(),
+          }, SetOptions(merge: true));
+        }
+      }
+      if (mounted) setState(() => _hasSynced = true);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -127,6 +175,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               });
               return;
             }
+
             setModalState(() {
               isResolving = true;
               resolveError = null;
@@ -145,8 +194,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               });
             } catch (e) {
               final msg = extractErrorMessage(e);
-              // On web, Flutterwave API is blocked by CORS — show soft warning
-              // so users can still proceed without name verification.
               final isCors = msg.toLowerCase().contains('cors') ||
                   msg.toLowerCase().contains('xmlhttprequest') ||
                   msg.toLowerCase().contains('failed to fetch') ||
@@ -156,8 +203,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               setModalState(() {
                 isResolving = false;
                 resolveError = isCors
-                    ? 'Account name lookup unavailable on web. Please verify the number manually before proceeding.'
-                    : msg;
+                    ? 'Account name lookup unavailable on web. You can still proceed with the transfer.'
+                    : '$msg — You can still proceed with the transfer if the account number is correct.';
               });
             }
           }

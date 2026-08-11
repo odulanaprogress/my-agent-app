@@ -879,6 +879,7 @@ class EscrowDetailsScreen extends ConsumerWidget {
                 });
                 return;
               }
+
               setModalState(() {
                 isResolving = true;
                 resolveError = null;
@@ -906,8 +907,8 @@ class EscrowDetailsScreen extends ConsumerWidget {
                 setModalState(() {
                   isResolving = false;
                   resolveError = isCors
-                      ? 'Account name lookup unavailable on web. Please verify the number manually before proceeding.'
-                      : msg;
+                      ? 'Account name lookup unavailable on web. You can still proceed with the transfer.'
+                      : '$msg — You can still proceed with the transfer if the account number is correct.';
                 });
               }
             }
