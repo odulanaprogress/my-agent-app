@@ -315,47 +315,55 @@ class EscrowApiService {
     if (secretKey.isEmpty) {
       throw AppException('Flutterwave Secret Key is not configured.');
     }
-    
-    String resolveBankCode = bankCode.trim();
-    
-    // A robust mapping for Live Flutterwave Name Resolution for Fintechs (NIP codes):
-    final Map<String, String> liveResolveCodes = {
-      '100033': '999991', // PalmPay NIP
-      '100004': '999992', // OPay NIP
-    };
-    if (liveResolveCodes.containsKey(resolveBankCode)) {
-      resolveBankCode = liveResolveCodes[resolveBankCode]!;
-    }
 
     try {
-          }
-        };
-      }
-      throw AppException(res['error'] ?? 'Unable to verify account name.');
-    } catch (e) {
-      if (e is AppException) rethrow;
-      
-      // If the NIP code fails, try falling back to the original transfer code
-      if (resolveBankCode != bankCode.trim()) {
-        try {
-          final fallbackRes = await ApiClient.post('/bank/resolve', {
+      if (kIsWeb) {
+        // WEB: Route through Vercel Serverless Function (/api/bank/resolve) to bypass CORS
+        final Uri url = Uri.base.resolve('/api/bank/resolve');
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
             'accountNumber': accountNumber.trim(),
             'bankCode': bankCode.trim(),
-          });
-          if (fallbackRes['success'] == true && fallbackRes['data'] != null) {
-            return {
-              'status': 'success',
-              'data': {
-                'account_name': fallbackRes['data']['accountName'],
-                'account_number': fallbackRes['data']['accountNumber'],
-              }
-            };
-          }
-        } catch (_) {}
+          }),
+        );
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        
+        if (response.statusCode >= 200 && response.statusCode < 300 && body['success'] == true) {
+          return {
+            'status': 'success',
+            'data': {
+              'account_name': body['data']['accountName'],
+              'account_number': body['data']['accountNumber'],
+            }
+          };
+        }
+        throw AppException(body['error'] ?? 'Unable to resolve account number.');
+      } else {
+        // MOBILE: Call Flutterwave API directly (no CORS restrictions on native apps)
+        final Uri url = Uri.parse('https://api.flutterwave.com/v3/accounts/resolve');
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${secretKey.trim()}',
+          },
+          body: jsonEncode({
+            'account_number': accountNumber.trim(),
+            'account_bank': bankCode.trim(),
+          }),
+        );
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        
+        if (response.statusCode >= 200 && response.statusCode < 300 && body['status'] == 'success') {
+          return body;
+        }
+        throw AppException(body['message'] ?? 'Unable to resolve account number for selected bank.');
       }
-
-      final errMsg = e.toString().replaceAll('Exception: ', '');
-      throw AppException(errMsg);
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException('Network error: Unable to verify account name.');
     }
   }
 
