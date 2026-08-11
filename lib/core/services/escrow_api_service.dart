@@ -314,6 +314,22 @@ class EscrowApiService {
     if (secretKey.isEmpty) {
       throw AppException('Flutterwave Secret Key is not configured.');
     }
+    
+    // DEBUG LOGGING AS REQUESTED BY USER
+    final acctClean = accountNumber.trim();
+    final bankClean = bankCode.trim();
+    final keyPreview = secretKey.length >= 12 ? secretKey.substring(0, 12) : secretKey;
+    final keySuffix = secretKey.length >= 5 ? secretKey.substring(secretKey.length - 5) : secretKey;
+    
+    debugPrint('=========================================');
+    debugPrint('FLUTTERWAVE RESOLVE DIAGNOSTICS:');
+    debugPrint('Key Prefix: $keyPreview...');
+    debugPrint('Key Suffix: ...$keySuffix');
+    debugPrint('Is Test Key: ${secretKey.endsWith('-X')}');
+    debugPrint('Bank Code Sent: "$bankClean"');
+    debugPrint('Account Sent: "$acctClean"');
+    debugPrint('=========================================');
+
     final Uri url = Uri.parse('https://api.flutterwave.com/v3/accounts/resolve');
     final response = await http.post(
       url,
@@ -322,16 +338,23 @@ class EscrowApiService {
         'Authorization': 'Bearer ${secretKey.trim()}',
       },
       body: jsonEncode({
-        'account_number': accountNumber.trim(),
-        'account_bank': bankCode.trim(),
+        'account_number': acctClean,
+        'account_bank': bankClean,
       }),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode >= 200 && response.statusCode < 300 && body['status'] == 'success') {
       return body;
     } else {
-      final msg = body['message'] ?? 'Unable to resolve account number for selected bank.';
-      throw AppException(msg.toString());
+      final fwError = body['message'] ?? 'Unable to resolve account number for selected bank.';
+      // Prepend diagnostics to the error so it shows directly on the device screen
+      throw AppException(
+        'FW_ERROR: $fwError\n'
+        'DIAGNOSTICS:\n'
+        'Key: $keyPreview...$keySuffix\n'
+        'Bank: "$bankClean"\n'
+        'Acct: "$acctClean"'
+      );
     }
   }
 
