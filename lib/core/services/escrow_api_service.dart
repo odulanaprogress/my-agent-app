@@ -305,23 +305,15 @@ class EscrowApiService {
     }
   }
 
-  /// Resolve Nigerian Bank Account Name via Flutterwave API (/v3/accounts/resolve)
+  /// Resolve Nigerian Bank Account Name via Node Backend (Proxy to Flutterwave /v3/accounts/resolve)
+  /// This bypasses Web CORS issues and uses the backend's secret key.
   Future<Map<String, dynamic>> resolveAccountName({
     required String accountNumber,
     required String bankCode,
   }) async {
-    final secretKey = EnvConfig.flutterwaveSecretKey;
-    if (secretKey.isEmpty) {
-      throw AppException('Flutterwave Secret Key is not configured.');
-    }
-    
     String resolveBankCode = bankCode.trim();
-    // Use NIP codes for Fintechs for name resolution if the standard transfer codes fail on LIVE
-    if (resolveBankCode == '100033') resolveBankCode = '090333'; // PalmPay alternative NIP
-    if (resolveBankCode == '100004') resolveBankCode = '090267'; // OPay alternative NIP (usually 090267 or 999992, but we'll try Flutterwave's resolve mapping)
-    // Actually, Flutterwave docs state Opay is 090267 or 999992. Let's try to stick to standard codes first.
     
-    // A more robust mapping for Live Flutterwave Name Resolution for Fintechs:
+    // A robust mapping for Live Flutterwave Name Resolution for Fintechs (NIP codes):
     final Map<String, String> liveResolveCodes = {
       '100033': '999991', // PalmPay NIP
       '100004': '999992', // OPay NIP
@@ -330,50 +322,47 @@ class EscrowApiService {
       resolveBankCode = liveResolveCodes[resolveBankCode]!;
     }
 
-    final Uri url = Uri.parse('https://api.flutterwave.com/v3/accounts/resolve');
-    
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${secretKey.trim()}',
-        },
-        body: jsonEncode({
-          'account_number': accountNumber.trim(),
-          'account_bank': resolveBankCode,
-        }),
-      );
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      
-      if (response.statusCode >= 200 && response.statusCode < 300 && body['status'] == 'success') {
-        return body;
-      }
-      
-      // If the mapped NIP code failed, try one more time with the original transfer code as fallback
-      if (resolveBankCode != bankCode.trim()) {
-        final fallbackResponse = await http.post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${secretKey.trim()}',
-          },
-          body: jsonEncode({
-            'account_number': accountNumber.trim(),
-            'account_bank': bankCode.trim(),
-          }),
-        );
-        final fallbackBody = jsonDecode(fallbackResponse.body) as Map<String, dynamic>;
-        if (fallbackResponse.statusCode >= 200 && fallbackResponse.statusCode < 300 && fallbackBody['status'] == 'success') {
-          return fallbackBody;
-        }
-      }
+      final res = await ApiClient.post('/bank/resolve', {
+        'accountNumber': accountNumber.trim(),
+        'bankCode': resolveBankCode,
+      });
 
-      final msg = body['message'] ?? 'Unable to resolve account number for selected bank.';
-      throw AppException(msg.toString());
+      if (res['success'] == true && res['data'] != null) {
+        // Mock the response format to match what the UI previously expected from Flutterwave directly
+        return {
+          'status': 'success',
+          'data': {
+            'account_name': res['data']['accountName'],
+            'account_number': res['data']['accountNumber'],
+          }
+        };
+      }
+      throw AppException(res['error'] ?? 'Unable to verify account name.');
     } catch (e) {
       if (e is AppException) rethrow;
-      throw AppException('Network error: Unable to verify account name.');
+      
+      // If the NIP code fails, try falling back to the original transfer code
+      if (resolveBankCode != bankCode.trim()) {
+        try {
+          final fallbackRes = await ApiClient.post('/bank/resolve', {
+            'accountNumber': accountNumber.trim(),
+            'bankCode': bankCode.trim(),
+          });
+          if (fallbackRes['success'] == true && fallbackRes['data'] != null) {
+            return {
+              'status': 'success',
+              'data': {
+                'account_name': fallbackRes['data']['accountName'],
+                'account_number': fallbackRes['data']['accountNumber'],
+              }
+            };
+          }
+        } catch (_) {}
+      }
+
+      final errMsg = e.toString().replaceAll('Exception: ', '');
+      throw AppException(errMsg);
     }
   }
 
