@@ -248,12 +248,14 @@ class EscrowApiService {
             }
           }
         }
-      } catch (_) {
-        // Direct network verification error
+      } catch (e) {
+        throw AppException('Network error during payment verification: $e');
       }
+    } else {
+      throw AppException('Flutterwave Secret Key is not configured. Live verification requires the secret key.');
     }
 
-    return true; // Return true to update status in repository & Firestore
+    throw AppException('Payment has not been confirmed yet. Please ensure you have transferred the funds, or wait a few minutes.');
   }
 
   /// Settle Escrow Transaction via Flutterwave Escrow Settlement Endpoint (/transactions/escrow/settle)

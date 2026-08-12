@@ -53,6 +53,12 @@ const verifyEscrowPin = async (req, res, next) => {
         updates.possessionConfirmed = true;
         updates.possessionConfirmedAt = admin.firestore.FieldValue.serverTimestamp();
         updates.status = 'releasing';
+
+        // Auto-remove property from available listings
+        if (tx.propertyId) {
+          const propRef = db.collection('properties').doc(tx.propertyId);
+          t.update(propRef, { isRented: true, isAvailable: false });
+        }
       }
 
       t.update(txDocRef, updates);

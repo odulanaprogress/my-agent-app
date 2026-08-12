@@ -15,6 +15,7 @@ import '../../../legal/presentation/screens/tenancy_agreement_screen.dart';
 
 import '../widgets/payment_receipt_dialog.dart';
 import 'package:agent_app/core/utils/app_exception.dart';
+import '../../../../core/constants/nigerian_banks.dart';
 
 class EscrowDetailsScreen extends ConsumerWidget {
   const EscrowDetailsScreen({super.key, required this.transactionId});
@@ -842,23 +843,7 @@ class EscrowDetailsScreen extends ConsumerWidget {
     String? resolveError;
     String? transferError;
 
-    final banks = [
-      {'code': '058', 'name': 'Guaranty Trust Bank (GTBank)'},
-      {'code': '044', 'name': 'Access Bank'},
-      {'code': '057', 'name': 'Zenith Bank PLC'},
-      {'code': '033', 'name': 'United Bank for Africa (UBA)'},
-      {'code': '011', 'name': 'First Bank of Nigeria'},
-      {'code': '100004', 'name': 'OPay Digital Services'},
-      {'code': '100033', 'name': 'PalmPay'},
-      {'code': '090405', 'name': 'Moniepoint Microfinance Bank'},
-      {'code': '090267', 'name': 'Kuda Bank'},
-      {'code': '035', 'name': 'Wema Bank PLC'},
-      {'code': '214', 'name': 'First City Monument Bank (FCMB)'},
-      {'code': '070', 'name': 'Fidelity Bank'},
-      {'code': '232', 'name': 'Sterling Bank'},
-      {'code': '032', 'name': 'Union Bank of Nigeria'},
-      {'code': '221', 'name': 'Stanbic IBTC Bank'},
-    ];
+    final banks = nigerianBanks;
 
     showModalBottomSheet(
       context: context,

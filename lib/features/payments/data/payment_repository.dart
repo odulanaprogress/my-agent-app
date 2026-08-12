@@ -259,6 +259,14 @@ class PaymentRepository {
             });
           }
         } catch (_) {}
+        // Auto-remove property from available listings
+        final propertyId = data['propertyId'] as String?;
+        if (propertyId != null && propertyId.isNotEmpty) {
+           tx.update(_firestore.collection('properties').doc(propertyId), {
+             'isRented': true,
+             'isAvailable': false,
+           });
+        }
       }
 
       tx.update(ref, updates);

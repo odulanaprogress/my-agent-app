@@ -14,7 +14,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/services/escrow_api_service.dart';
 import '../../../../core/utils/app_exception.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
-
+import '../../../../core/constants/nigerian_banks.dart';
 
 // Real-time wallet data provider
 final _walletDataProvider = StreamProvider.autoDispose<WalletData>((ref) {
@@ -142,23 +142,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     String? resolveError;
     String? transferError;
 
-    final banks = [
-      {'code': '058', 'name': 'Guaranty Trust Bank (GTBank)'},
-      {'code': '044', 'name': 'Access Bank'},
-      {'code': '057', 'name': 'Zenith Bank PLC'},
-      {'code': '033', 'name': 'United Bank for Africa (UBA)'},
-      {'code': '011', 'name': 'First Bank of Nigeria'},
-      {'code': '100004', 'name': 'OPay Digital Services'},
-      {'code': '100033', 'name': 'PalmPay'},
-      {'code': '090405', 'name': 'Moniepoint Microfinance Bank'},
-      {'code': '090267', 'name': 'Kuda Bank'},
-      {'code': '035', 'name': 'Wema Bank PLC'},
-      {'code': '214', 'name': 'First City Monument Bank (FCMB)'},
-      {'code': '070', 'name': 'Fidelity Bank'},
-      {'code': '232', 'name': 'Sterling Bank'},
-      {'code': '032', 'name': 'Union Bank of Nigeria'},
-      {'code': '221', 'name': 'Stanbic IBTC Bank'},
-    ];
+    // Inside the _showWithdrawSheet method, we can just use the imported nigerianBanks
+    final banks = nigerianBanks;
 
     await showModalBottomSheet(
       context: context,
