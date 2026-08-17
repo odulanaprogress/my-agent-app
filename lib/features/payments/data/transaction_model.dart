@@ -18,8 +18,6 @@ class TransactionModel {
     required this.possessionConfirmedAt,
     required this.landlordPaidOut,
     required this.payoutAt,
-    this.tenantPin,
-    this.landlordPin,
     this.tenantPinVerified = false,
     this.landlordPinVerified = false,
     this.commissionPercent = 5.0,
@@ -47,8 +45,6 @@ class TransactionModel {
   final Timestamp? payoutAt;
 
   // Dual Escrow PIN Verification Fields
-  final String? tenantPin;
-  final String? landlordPin;
   final bool tenantPinVerified;
   final bool landlordPinVerified;
 
@@ -113,8 +109,6 @@ class TransactionModel {
       landlordPaidOut: map['landlordPaidOut'] == true,
       payoutAt: parseNullableTimestamp(map['payoutAt']),
 
-      tenantPin: map['tenantPin']?.toString(),
-      landlordPin: map['landlordPin']?.toString(),
       tenantPinVerified: map['tenantPinVerified'] == true,
       landlordPinVerified: map['landlordPinVerified'] == true,
       commissionPercent: commPct,
@@ -144,8 +138,6 @@ class TransactionModel {
       'landlordPaidOut': landlordPaidOut,
       'payoutAt': payoutAt,
 
-      'tenantPin': tenantPin,
-      'landlordPin': landlordPin,
       'tenantPinVerified': tenantPinVerified,
       'landlordPinVerified': landlordPinVerified,
       'commissionPercent': commissionPercent,

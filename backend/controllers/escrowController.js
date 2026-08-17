@@ -38,12 +38,18 @@ const verifyEscrowPin = async (req, res, next) => {
       let landlordPinVerified = tx.landlordPinVerified || false;
 
       if (role === 'tenant') {
-        if (tx.landlordPin !== cleanPin) {
+        const lpDoc = await t.get(txDocRef.collection('pins').doc(tx.landlordId));
+        const landlordPin = lpDoc.exists ? lpDoc.data().pin : null;
+
+        if (!landlordPin || landlordPin !== cleanPin) {
           throw new Error('Invalid Landlord Handover PIN. Please verify with the Landlord.');
         }
         tenantPinVerified = true;
       } else if (role === 'landlord') {
-        if (tx.tenantPin !== cleanPin) {
+        const tpDoc = await t.get(txDocRef.collection('pins').doc(tx.tenantId));
+        const tenantPin = tpDoc.exists ? tpDoc.data().pin : null;
+
+        if (!tenantPin || tenantPin !== cleanPin) {
           throw new Error('Invalid Tenant Key Receipt PIN. Please verify with the Tenant.');
         }
         landlordPinVerified = true;

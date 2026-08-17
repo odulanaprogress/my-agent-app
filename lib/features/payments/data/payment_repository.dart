@@ -24,12 +24,8 @@ class PaymentRepository {
   DocumentReference<Map<String, dynamic>> walletDoc(String uid) =>
       _firestore.collection('wallets').doc(uid);
 
-  String _generatePin() {
-    final rnd = Random.secure();
-    return (100000 + rnd.nextInt(900000)).toString();
-  }
 
-  /// Creates a transaction for an escrow payment (status: held/pending based on your flow).
+
   Future<String> createEscrowTransaction({
     required String transactionId,
     required String tenantId,
@@ -38,50 +34,37 @@ class PaymentRepository {
     required int amount,
     required EscrowStatus status,
     required DateTime createdAt,
-    String? tenantPin,
-    String? landlordPin,
     String? virtualAccountNumber,
     String? virtualBankName,
     String? virtualAccountName,
     String? txRef,
   }) async {
-    final tPin = tenantPin ?? _generatePin();
-    final lPin = landlordPin ?? _generatePin();
+    final response = await _apiService.initializePayment(
+      transactionId: transactionId,
+      tenantId: tenantId,
+      landlordId: landlordId,
+      propertyId: propertyId,
+      amount: amount,
+    );
+    
+    final txRefId = response['txRef'] as String? ?? transactionId;
 
     final commissionPercent = 20.0;
     final commissionAmount = (amount * (commissionPercent / 100)).round();
     final netPayoutAmount = amount - commissionAmount;
 
-    await _txCollection.doc(transactionId).set({
-      'tenantId': tenantId,
-      'landlordId': landlordId,
-      'propertyId': propertyId,
-      'amount': amount,
-      'status': status.asFirestoreValue,
-      'type': TransactionType.escrow.asFirestoreValue,
-      'createdAt': Timestamp.fromDate(createdAt),
-
-      'tenantPin': tPin,
-      'landlordPin': lPin,
-      'tenantPinVerified': false,
-      'landlordPinVerified': false,
+    await _txCollection.doc(txRefId).update({
       'commissionPercent': commissionPercent,
       'commissionAmount': commissionAmount,
       'netPayoutAmount': netPayoutAmount,
-
-      'possessionConfirmed': false,
-      'possessionConfirmedAt': null,
-      'landlordPaidOut': false,
-      'payoutAt': null,
-
       'virtualAccountNumber': virtualAccountNumber,
       'virtualBankName': virtualBankName ?? 'Wema Bank (Flutterwave)',
       'virtualAccountName': virtualAccountName ?? 'FLUTTERWAVE / AGENT ESCROW',
-      'txRef': txRef ?? 'FLW-ESC-${transactionId.substring(0, 8).toUpperCase()}',
+      'txRef': txRef ?? 'FLW-ESC-${txRefId.substring(0, 8).toUpperCase()}',
       'paidAt': status == EscrowStatus.held ? Timestamp.now() : null,
     });
 
-    return transactionId;
+    return txRefId;
   }
 
   /// Verifies transfer received by Flutterwave, updates status from pending to held, and notifies Landlord.
@@ -150,135 +133,21 @@ class PaymentRepository {
   }
 
 
-  /// Verifies a 6-digit Escrow Handshake PIN via Backend REST API (with Firestore fallback).
+  /// Verifies a 6-digit Escrow Handshake PIN via Backend REST API.
   Future<Map<String, dynamic>> verifyEscrowPin({
     required String transactionId,
     required String pin,
     required String role, // 'tenant' or 'landlord'
   }) async {
-    try {
-      // Try Backend REST API first
-      final apiResponse = await _apiService.verifyEscrowPin(
-        transactionId: transactionId,
-        pin: pin,
-        role: role,
-      );
-      if (apiResponse['success'] == true) {
-        return apiResponse;
-      }
-    } catch (_) {
-      // Fallback to direct Firestore atomic transaction
+    final apiResponse = await _apiService.verifyEscrowPin(
+      transactionId: transactionId,
+      pin: pin,
+      role: role,
+    );
+    if (apiResponse['success'] == true) {
+      return apiResponse;
     }
-
-    return await _firestore.runTransaction((tx) async {
-      final ref = _txCollection.doc(transactionId);
-      final snap = await tx.get(ref);
-      if (!snap.exists) {
-        throw StateError('Transaction not found: $transactionId');
-      }
-
-      final data = snap.data()!;
-      final tenantPin = data['tenantPin'] as String?;
-      final landlordPin = data['landlordPin'] as String?;
-      bool tenantPinVerified = data['tenantPinVerified'] ?? false;
-      bool landlordPinVerified = data['landlordPinVerified'] ?? false;
-
-      final cleanPin = pin.trim();
-
-      if (role == 'tenant') {
-        // Tenant enters Landlord's PIN
-        if (landlordPin == null || cleanPin != landlordPin) {
-          throw AppException('Invalid Handover PIN entered. Please verify with the Landlord.');
-        }
-        tenantPinVerified = true;
-      } else if (role == 'landlord') {
-        // Landlord enters Tenant's PIN
-        if (tenantPin == null || cleanPin != tenantPin) {
-          throw AppException('Invalid Key Receipt PIN entered. Please verify with the Tenant.');
-        }
-        landlordPinVerified = true;
-      } else {
-        throw AppException('Invalid user role');
-      }
-
-      final bool bothVerified = tenantPinVerified && landlordPinVerified;
-
-      final Map<String, dynamic> updates = {
-        'tenantPinVerified': tenantPinVerified,
-        'landlordPinVerified': landlordPinVerified,
-        'updatedAt': Timestamp.now(),
-      };
-
-      if (bothVerified) {
-        updates['possessionConfirmed'] = true;
-        updates['possessionConfirmedAt'] = Timestamp.now();
-        updates['status'] = EscrowStatus.released.asFirestoreValue;
-        updates['landlordPaidOut'] = true;
-        updates['payoutAt'] = Timestamp.now();
-
-        // Trigger Flutterwave Escrow Settlement API (/transactions/escrow/settle)
-        final netPayout = data['netPayoutAmount'] ?? data['amount'] ?? 0;
-        final netPayoutInt = netPayout is int ? netPayout : (netPayout as num).toInt();
-        _apiService.settleFlutterwaveEscrow(
-          transactionId: transactionId,
-          amount: netPayoutInt,
-        );
-
-        // Wallet credit is handled server-side by the backend escrowController
-        // or Cloud Functions verifyEscrowPin — both use Admin SDK.
-        // Trigger backend settle endpoint to credit landlord wallet server-side:
-        final landlordId = data['landlordId'] as String?;
-        if (landlordId != null && landlordId.isNotEmpty && netPayoutInt > 0) {
-          _apiService.settleFlutterwaveEscrow(
-            transactionId: transactionId,
-            amount: netPayoutInt,
-          );
-        }
-
-        // Generate official Tenancy Agreement record & notify Tenant
-        try {
-          final now = Timestamp.now();
-          _firestore.collection('tenancy_agreements').doc(transactionId).set({
-            'transactionId': transactionId,
-            'propertyId': data['propertyId'] ?? '',
-            'tenantId': data['tenantId'] ?? '',
-            'landlordId': data['landlordId'] ?? '',
-            'amount': data['amount'] ?? 0,
-            'status': 'active',
-            'createdAt': now,
-          });
-
-          final tenantId = data['tenantId'] as String?;
-          if (tenantId != null && tenantId.isNotEmpty) {
-            _firestore.collection('notifications').add({
-              'userId': tenantId,
-              'title': '📜 Tenancy Agreement Issued!',
-              'body': 'Congratulations! Your key handover is confirmed and your official signed Tenancy Agreement document is now available.',
-              'isRead': false,
-              'createdAt': now,
-              'targetId': transactionId,
-            });
-          }
-        } catch (_) {}
-        // Auto-remove property from available listings
-        final propertyId = data['propertyId'] as String?;
-        if (propertyId != null && propertyId.isNotEmpty) {
-           tx.update(_firestore.collection('properties').doc(propertyId), {
-             'isRented': true,
-             'isAvailable': false,
-           });
-        }
-      }
-
-      tx.update(ref, updates);
-
-      return {
-        'success': true,
-        'tenantPinVerified': tenantPinVerified,
-        'landlordPinVerified': landlordPinVerified,
-        'bothVerified': bothVerified,
-      };
-    });
+    throw AppException(apiResponse['error'] ?? 'Verification failed');
   }
 
 

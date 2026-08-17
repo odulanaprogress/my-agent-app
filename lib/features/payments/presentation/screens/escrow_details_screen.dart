@@ -249,8 +249,6 @@ class EscrowDetailsScreen extends ConsumerWidget {
 
         final isTenant = role == 'tenant';
 
-        final myPin = isTenant ? tx.tenantPin : tx.landlordPin;
-
         final counterpartyVerified = isTenant ? tx.landlordPinVerified : tx.tenantPinVerified;
         final myVerified = isTenant ? tx.tenantPinVerified : tx.landlordPinVerified;
 
@@ -553,38 +551,52 @@ class EscrowDetailsScreen extends ConsumerWidget {
                           const SizedBox(height: 14),
 
                           // PIN DISPLAY BOX
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  myPin ?? '──────',
-                                  style: const TextStyle(
-                                    color: Colors.amber,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 6,
-                                  ),
+                          FutureBuilder<String?>(
+                            future: FirebaseFirestore.instance
+                                .collection('transactions')
+                                .doc(transactionId)
+                                .collection('pins')
+                                .doc(currentUser?.uid ?? '')
+                                .get()
+                                .then((doc) => doc.exists ? doc.data()?['pin'] as String? : null),
+                            builder: (context, pinSnapshot) {
+                              final myPin = pinSnapshot.data;
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.copy_rounded, color: Colors.white),
-                                  onPressed: myPin == null
-                                      ? null
-                                      : () {
-                                          Clipboard.setData(ClipboardData(text: myPin));
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('PIN copied to clipboard!')),
-                                          );
-                                        },
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      pinSnapshot.connectionState == ConnectionState.waiting
+                                          ? '...'
+                                          : (myPin ?? '──────'),
+                                      style: const TextStyle(
+                                        color: Colors.amber,
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 6,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.copy_rounded, color: Colors.white),
+                                      onPressed: myPin == null
+                                          ? null
+                                          : () {
+                                              Clipboard.setData(ClipboardData(text: myPin));
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('PIN copied to clipboard!')),
+                                              );
+                                            },
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              );
+                            }
                           ),
 
                           const SizedBox(height: 20),

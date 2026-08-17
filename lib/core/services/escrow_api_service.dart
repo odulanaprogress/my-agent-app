@@ -19,12 +19,14 @@ class EscrowApiService {
 
   /// Initialize Payment Reference via Backend REST API.
   Future<Map<String, dynamic>> initializePayment({
+    required String transactionId,
     required String tenantId,
     required String landlordId,
     required String propertyId,
     required int amount,
   }) async {
     return (await ApiClient.post('/payments/initialize', {
+      'transactionId': transactionId,
       'tenantId': tenantId,
       'landlordId': landlordId,
       'propertyId': propertyId,

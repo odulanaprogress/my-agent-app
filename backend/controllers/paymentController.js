@@ -6,14 +6,20 @@ const flutterwaveService = require('../services/flutterwaveService');
  */
 const initializePayment = async (req, res, next) => {
   try {
-    const { tenantId, landlordId, propertyId, amount } = req.body;
+    const { transactionId, tenantId, landlordId, propertyId, amount } = req.body;
     if (!tenantId || !landlordId || !propertyId || !amount) {
       return res.status(400).json({ success: false, error: 'Missing tenantId, landlordId, propertyId, or amount' });
     }
 
-    const txRef = `AGENT-ESCROW-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const txRef = transactionId || `AGENT-ESCROW-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    await db.collection('transactions').doc(txRef).set({
+    const tenantPin = Math.floor(100000 + Math.random() * 900000).toString();
+    const landlordPin = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const batch = db.batch();
+    const txDoc = db.collection('transactions').doc(txRef);
+
+    batch.set(txDoc, {
       id: txRef,
       tenantId: tenantId,
       landlordId: landlordId,
@@ -24,7 +30,17 @@ const initializePayment = async (req, res, next) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       possessionConfirmed: false,
       landlordPaidOut: false,
+      tenantPinVerified: false,
+      landlordPinVerified: false,
     });
+
+    const tenantPinDoc = txDoc.collection('pins').doc(tenantId);
+    batch.set(tenantPinDoc, { pin: tenantPin, role: 'tenant' });
+
+    const landlordPinDoc = txDoc.collection('pins').doc(landlordId);
+    batch.set(landlordPinDoc, { pin: landlordPin, role: 'landlord' });
+
+    await batch.commit();
 
     return res.status(200).json({
       success: true,
