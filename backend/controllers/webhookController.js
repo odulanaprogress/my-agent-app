@@ -48,8 +48,8 @@ const handleWebhook = async (req, res, next) => {
         commissionPercent: commissionPercent,
         commissionAmount: commissionAmount,
         netPayoutAmount: netPayoutAmount,
-        tenantPin: tenantPin,
-        landlordPin: landlordPin,
+        // NOTE: PINs are NOT stored on the main document.
+        // They are written to private subcollections below.
         tenantPinVerified: false,
         landlordPinVerified: false,
         possessionConfirmed: false,
@@ -58,26 +58,43 @@ const handleWebhook = async (req, res, next) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
+      const batch = db.batch();
+
       if (snap.exists) {
-        await txDocRef.update(updateData);
+        batch.update(txDocRef, updateData);
       } else {
-        await txDocRef.set({
+        batch.set(txDocRef, {
           id: txRef,
           ...updateData,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
 
+      // Store PINs in private subcollections — Firestore rules allow only the
+      // owner to read their own PIN. No PIN ever appears on the main document.
       const txData = snap.exists ? snap.data() : {};
       const tenantId = txData.tenantId;
       const landlordId = txData.landlordId;
 
-      // 4. Send Instant Push Notifications to Tenant & Landlord
+      if (tenantId) {
+        batch.set(txDocRef.collection('pins').doc(tenantId), { pin: tenantPin, role: 'tenant' });
+      }
+      if (landlordId) {
+        batch.set(txDocRef.collection('pins').doc(landlordId), { pin: landlordPin, role: 'landlord' });
+      }
+
+      await batch.commit();
+
+      // Safe log — correlation IDs only, NO secret values
+      console.log(`✅ Escrow established txRef=${txRef} flwTxId=${flwTxId}`);
+
+
+      // Push notifications — NO PINs in the message body
       if (tenantId) {
         await sendPushNotification({
           userId: tenantId,
           title: '🛡️ Rent Payment Placed in Escrow',
-          message: `Your rent payment of ₦${amountPaid} is secure in Escrow. Your Key Receipt PIN is ${tenantPin}.`,
+          message: `Your rent payment of ₦${amountPaid} is secured. Open the app to view your PIN.`,
           data: { type: 'escrow', transactionId: txRef },
         });
       }
@@ -86,13 +103,10 @@ const handleWebhook = async (req, res, next) => {
         await sendPushNotification({
           userId: landlordId,
           title: '🎉 Rent Received in Escrow Vault',
-          message: `Rent of ₦${amountPaid} has been deposited into Escrow. Your Handover PIN is ${landlordPin}.`,
+          message: `Rent of ₦${amountPaid} is in Escrow. Open the app to view your PIN.`,
           data: { type: 'escrow', transactionId: txRef },
         });
-      }
-
-      console.log(`✅ Escrow Established for ${txRef}! Tenant PIN: ${tenantPin}, Landlord PIN: ${landlordPin}`);
-    }
+      }    }
 
     return res.status(200).json({ success: true, message: 'Webhook Event Processed' });
   } catch (error) {

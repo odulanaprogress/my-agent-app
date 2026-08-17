@@ -102,8 +102,9 @@ const verifyEscrowPin = async (req, res, next) => {
             bankCode: bankCode,
             accountNumber: accountNumber,
             amount: netPayoutAmount,
-            narration: `Agent Rent Escrow Payout - Property ${txData.propertyId || ''}`,
-            reference: `PAYOUT-${transactionId}-${Date.now()}`,
+            narration: `Agent Rent Escrow Payout`,
+            // Static idempotency key \u2014 same on every retry, prevents duplicate payouts
+            reference: `PAYOUT-${transactionId}`,
           });
 
           await txDocRef.update({
