@@ -23,7 +23,9 @@ service cloud.firestore {
     // Users
     // ──────────────────────────────────────────
     match /users/{uid} {
-      // Anyone signed-in can read profiles (landlord/tenant marketplace & chat).
+      // Signed-in users can read basic profile fields (name, role, avatar) for marketplace/chat.
+      // Sensitive fields (bank details, KYC data) are NOT stored in /users — they live in
+      // /verifications/{uid} which is restricted to owner + admin only.
       allow read: if signedIn();
 
       // Owner can create their own profile — but cannot give themselves admin role.
@@ -114,6 +116,13 @@ service cloud.firestore {
       ) || isAdmin();
 
       allow delete: if isAdmin();
+
+      // Secure Subcollection: PINs
+      // Backend creates these. User can only read their own PIN.
+      match /pins/{userId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isAdmin();
+      }
     }
 
     // ──────────────────────────────────────────
@@ -126,26 +135,21 @@ service cloud.firestore {
     match /wallets/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       // No client writes allowed — prevents fake balance injection.
-      // The Cloudflare Workers withdrawal handler uses the Firestore REST API
-      // with the user's own token for READS, then updates via the same token.
-      // Since client writes are blocked here, only the Admin SDK path works for
-      // balance mutations (Cloud Functions webhook + escrow payout).
-      //
-      // NOTE: The Cloudflare Workers /payments/withdraw handler uses the user's
-      // Firebase ID token to call the Firestore REST API PATCH endpoint directly.
-      // This rule must allow that. The Workers handler is trusted because it
-      // reads the balance server-side before writing — the client can't forge it.
-      // We allow owner writes here specifically to support the Workers withdrawal flow.
-      allow write: if isOwner(uid) || isAdmin();
+      // The Cloudflare Workers withdrawal handler uses a secure GCP Service Account
+      // to act as Admin when modifying this balance.
+      allow write: if isAdmin();
     }
 
     // ──────────────────────────────────────────
     // Notifications
     // ──────────────────────────────────────────
     match /notifications/{notificationId} {
+      // Users can only read their own notifications
       allow read: if signedIn() &&
         request.auth.uid == resource.data.userId;
-      allow create: if signedIn();
+      // Users can only create notifications for themselves (prevents spam/abuse)
+      allow create: if signedIn() &&
+        request.resource.data.userId == request.auth.uid;
       allow update, delete: if signedIn() &&
         (request.auth.uid == resource.data.userId || isAdmin());
     }

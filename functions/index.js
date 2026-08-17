@@ -202,12 +202,22 @@ function generateSixDigitPin() {
  */
 exports.flutterwaveWebhook = functions.https.onRequest(async (req, res) => {
   try {
-    // 1. Verify Secret Hash Header
-    const secretHash = process.env.FLUTTERWAVE_SECRET_HASH;
-    const signature = req.headers["verif-hash"];
+    // 1. Verify Secret Hash using constant-time comparison (prevents timing attacks)
+    const crypto = require("crypto");
+    const secretHash = process.env.FLUTTERWAVE_SECRET_HASH || "";
+    const signature = req.headers["verif-hash"] || "";
 
-    if (!signature || signature !== secretHash) {
-      console.warn("Unauthorized webhook request: Hash signature mismatch");
+    if (!secretHash) {
+      console.error("FLUTTERWAVE_SECRET_HASH is not configured.");
+      return res.status(500).send("Server misconfiguration");
+    }
+
+    const a = Buffer.from(signature);
+    const b = Buffer.from(secretHash);
+    const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
+
+    if (!valid) {
+      console.warn("Unauthorized webhook request: signature mismatch");
       return res.status(401).send("Unauthorized");
     }
 
@@ -245,16 +255,15 @@ exports.flutterwaveWebhook = functions.https.onRequest(async (req, res) => {
       const txRefDoc = admin.firestore().collection("transactions").doc(txRef);
       const docSnap = await txRefDoc.get();
 
+      // Main transaction doc — NO PINs stored here
       const updateData = {
         flutterwaveTxId: flwTxId,
         amount: amountPaid,
         currency: currency,
-        status: "held", // Money is held in Escrow
+        status: "held",
         commissionPercent: commissionPercent,
         commissionAmount: commissionAmount,
         netPayoutAmount: netPayoutAmount,
-        tenantPin: tenantPin,
-        landlordPin: landlordPin,
         tenantPinVerified: false,
         landlordPinVerified: false,
         possessionConfirmed: false,
@@ -263,17 +272,34 @@ exports.flutterwaveWebhook = functions.https.onRequest(async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
+      const batch = admin.firestore().batch();
+
       if (docSnap.exists) {
-        await txRefDoc.update(updateData);
+        batch.update(txRefDoc, updateData);
       } else {
-        await txRefDoc.set({
+        batch.set(txRefDoc, {
           id: txRef,
           ...updateData,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
 
-      console.log(`Escrow established for transaction ${txRef}: Tenant PIN: ${tenantPin}, Landlord PIN: ${landlordPin}`);
+      // Store PINs in private subcollections — only owner can read their own
+      if (docSnap.exists && docSnap.data().tenantId) {
+        batch.set(txRefDoc.collection("pins").doc(docSnap.data().tenantId), {
+          pin: tenantPin, role: "tenant",
+        });
+      }
+      if (docSnap.exists && docSnap.data().landlordId) {
+        batch.set(txRefDoc.collection("pins").doc(docSnap.data().landlordId), {
+          pin: landlordPin, role: "landlord",
+        });
+      }
+
+      await batch.commit();
+
+      // Safe log — correlation ID only, NO PIN values
+      console.log(`Escrow established for txRef=${txRef} flwTxId=${flwTxId}`);
     }
 
     return res.status(200).send("Webhook Processed Successfully");
@@ -338,13 +364,24 @@ exports.verifyEscrowPin = functions.https.onCall(async (data, context) => {
 
   const txRef = admin.firestore().collection("transactions").doc(transactionId);
 
-  return await admin.firestore().runTransaction(async (t) => {
+  // ── Phase 1: Verify PIN inside Firestore transaction (atomic, no side effects) ──
+  let txData = null;
+  let bothVerified = false;
+  let tenantPinVerified = false;
+  let landlordPinVerified = false;
+
+  await admin.firestore().runTransaction(async (t) => {
     const docSnap = await t.get(txRef);
     if (!docSnap.exists) {
       throw new functions.https.HttpsError("not-found", "Transaction not found.");
     }
 
     const tx = docSnap.data();
+
+    // Guard: prevent re-processing an already-paid-out transaction
+    if (tx.landlordPaidOut) {
+      throw new functions.https.HttpsError("already-exists", "Payout already completed for this transaction.");
+    }
 
     // Verify role authorization
     if (role === "tenant" && tx.tenantId !== uid) {
@@ -354,90 +391,97 @@ exports.verifyEscrowPin = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError("permission-denied", "Unauthorized landlord.");
     }
 
-    let tenantPinVerified = tx.tenantPinVerified || false;
-    let landlordPinVerified = tx.landlordPinVerified || false;
+    tenantPinVerified = tx.tenantPinVerified || false;
+    landlordPinVerified = tx.landlordPinVerified || false;
 
-    // Check PIN match
-    // Tenant enters Landlord's PIN
-    if (role === "tenant") {
-      if (tx.landlordPin !== pin.trim()) {
-        throw new functions.https.HttpsError("invalid-argument", "Incorrect Landlord Handover PIN.");
-      }
-      tenantPinVerified = true;
+    // Fetch PIN from secure subcollection — NOT from main doc
+    const counterpartyId = role === "tenant" ? tx.landlordId : tx.tenantId;
+    const pinDoc = await t.get(txRef.collection("pins").doc(counterpartyId));
+    const expectedPin = pinDoc.exists ? pinDoc.data().pin : null;
+
+    if (!expectedPin || pin.trim() !== expectedPin) {
+      throw new functions.https.HttpsError("invalid-argument",
+        role === "tenant" ? "Incorrect Landlord Handover PIN." : "Incorrect Tenant Key Receipt PIN."
+      );
     }
 
-    // Landlord enters Tenant's PIN
-    if (role === "landlord") {
-      if (tx.tenantPin !== pin.trim()) {
-        throw new functions.https.HttpsError("invalid-argument", "Incorrect Tenant Key Receipt PIN.");
-      }
-      landlordPinVerified = true;
-    }
+    if (role === "tenant") tenantPinVerified = true;
+    if (role === "landlord") landlordPinVerified = true;
 
-    const bothVerified = tenantPinVerified && landlordPinVerified;
+    bothVerified = tenantPinVerified && landlordPinVerified;
+
     const updates = {
-      tenantPinVerified: tenantPinVerified,
-      landlordPinVerified: landlordPinVerified,
+      tenantPinVerified,
+      landlordPinVerified,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     if (bothVerified) {
       updates.possessionConfirmed = true;
       updates.possessionConfirmedAt = admin.firestore.FieldValue.serverTimestamp();
-      updates.status = "releasing"; // Transitioning state
+      // Mark as "payout_pending" — payout happens AFTER the transaction commits
+      updates.status = "payout_pending";
     }
 
     t.update(txRef, updates);
-
-    // If both PINs verified, execute automated payout to landlord bank account
-    if (bothVerified && !tx.landlordPaidOut) {
-      try {
-        const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
-        const landlordDoc = await admin.firestore().collection("users").doc(tx.landlordId).get();
-        const landlordData = landlordDoc.data() || {};
-        
-        const bankCode = landlordData.bankCode || tx.landlordBankCode || "044"; // default access bank or saved code
-        const accountNumber = landlordData.accountNumber || tx.landlordAccountNumber;
-        const netPayoutAmount = tx.netPayoutAmount || Math.round((tx.amount || 0) * 0.95);
-
-        if (accountNumber && bankCode) {
-          const payoutRes = await axios.post(
-            "https://api.flutterwave.com/v3/transfers",
-            {
-              account_bank: bankCode,
-              account_number: accountNumber,
-              amount: netPayoutAmount,
-              narration: `Agent Escrow Payout - Property ${tx.propertyId || ""}`,
-              currency: tx.currency || "NGN",
-              reference: `PAYOUT-${tx.id}-${Date.now()}`,
-            },
-            { headers: { Authorization: `Bearer ${secretKey}` } }
-          );
-
-          if (payoutRes.data && payoutRes.data.status === "success") {
-            t.update(txRef, {
-              status: "released",
-              landlordPaidOut: true,
-              payoutRef: payoutRes.data.data ? payoutRes.data.data.id : null,
-              payoutAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-          }
-        } else {
-          console.warn("Landlord bank details missing for automated payout. Marked as pending payout release.");
-          t.update(txRef, { status: "released" });
-        }
-      } catch (payoutError) {
-        console.error("Flutterwave Payout execution error:", payoutError.response ? payoutError.response.data : payoutError.message);
-        t.update(txRef, { status: "released", payoutError: payoutError.message });
-      }
-    }
-
-    return {
-      success: true,
-      tenantPinVerified,
-      landlordPinVerified,
-      bothVerified,
-    };
+    txData = tx; // capture for use outside transaction
   });
+
+  // ── Phase 2: Execute payout OUTSIDE the transaction (prevents double-payout on retry) ──
+  if (bothVerified && txData && !txData.landlordPaidOut) {
+    try {
+      const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+      const landlordDoc = await admin.firestore().collection("users").doc(txData.landlordId).get();
+      const landlordData = landlordDoc.data() || {};
+
+      const bankCode = landlordData.bankCode || txData.landlordBankCode;
+      const accountNumber = landlordData.accountNumber || txData.landlordAccountNumber;
+      const netPayoutAmount = txData.netPayoutAmount || Math.round((txData.amount || 0) * 0.95);
+
+      // Idempotency key — prevents duplicate transfer if function retries
+      const idempotencyRef = `PAYOUT-${transactionId}`;
+
+      if (accountNumber && bankCode) {
+        const payoutRes = await axios.post(
+          "https://api.flutterwave.com/v3/transfers",
+          {
+            account_bank: bankCode,
+            account_number: accountNumber,
+            amount: netPayoutAmount,
+            narration: `Agent Escrow Payout - ${transactionId}`,
+            currency: txData.currency || "NGN",
+            reference: idempotencyRef,
+          },
+          { headers: { Authorization: `Bearer ${secretKey}` } }
+        );
+
+        const payoutSucceeded = payoutRes.data && payoutRes.data.status === "success";
+        await txRef.update({
+          status: payoutSucceeded ? "released" : "payout_failed",
+          landlordPaidOut: payoutSucceeded,
+          payoutRef: payoutSucceeded && payoutRes.data.data ? payoutRes.data.data.id : null,
+          payoutAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Safe log — no amounts, no account numbers
+        console.log(`Payout ${payoutSucceeded ? "succeeded" : "failed"} for txId=${transactionId}`);
+      } else {
+        // Bank details missing — mark released, admin must disburse manually
+        console.warn(`Landlord bank details missing for txId=${transactionId}. Marked as released, manual payout required.`);
+        await txRef.update({ status: "released" });
+      }
+    } catch (payoutError) {
+      // Log error reference only — no sensitive payload
+      console.error(`Payout error for txId=${transactionId}:`, payoutError.code || payoutError.message);
+      await txRef.update({ status: "payout_failed", payoutError: payoutError.code || "unknown" });
+    }
+  }
+
+  return {
+    success: true,
+    tenantPinVerified,
+    landlordPinVerified,
+    bothVerified,
+  };
 });
 
