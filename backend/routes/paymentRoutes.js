@@ -5,7 +5,7 @@ const { requireAuth } = require('../middleware/authMiddleware');
 
 router.post('/initialize', requireAuth, paymentController.initializePayment);
 router.get('/verify/:flwTxId', requireAuth, paymentController.verifyPayment);
-router.post('/flutterwave/virtual-account', paymentController.generateVirtualAccount);
+router.post('/flutterwave/virtual-account', requireAuth, paymentController.generateVirtualAccount);
+router.post('/withdraw', requireAuth, paymentController.requestWithdrawal);
 
 module.exports = router;
-

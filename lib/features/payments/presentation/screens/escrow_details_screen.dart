@@ -833,7 +833,6 @@ class EscrowDetailsScreen extends ConsumerWidget {
   }
 
   void _showLandlordPayoutBankSheet(BuildContext context, WidgetRef ref, TransactionModel tx) {
-    final currentUser = ref.read(currentUserProvider);
     final accountController = TextEditingController();
     String selectedBankCode = '058';
     String selectedBankName = 'Guaranty Trust Bank (GTBank)';
@@ -1074,21 +1073,12 @@ class EscrowDetailsScreen extends ConsumerWidget {
                                 transferError = null;
                               });
                               try {
-                                await EscrowApiService().disburseLandlordPayout(
-                                  transactionId: tx.id,
+                                await EscrowApiService().requestWithdrawal(
                                   amount: tx.netPayoutAmount,
                                   bankCode: selectedBankCode,
                                   accountNumber: acct,
                                 );
-
-                                // Deduct balance in Firestore
-                                if (currentUser != null) {
-                                  await ref.read(walletRepositoryProvider).incrementBalance(
-                                    uid: currentUser.uid,
-                                    delta: -tx.netPayoutAmount,
-                                    updatedAt: DateTime.now(),
-                                  );
-                                }
+                                // Balance update handled server-side.
 
                                 Navigator.pop(modalCtx);
                                 if (context.mounted) {

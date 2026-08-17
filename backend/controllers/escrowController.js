@@ -8,7 +8,7 @@ const { sendPushNotification } = require('../services/onesignalService');
 const verifyEscrowPin = async (req, res, next) => {
   try {
     const { transactionId, pin, role } = req.body;
-    const uid = req.user ? req.user.uid : req.headers['x-user-uid'];
+    const uid = req.user.uid; // always from verified Firebase token
 
     if (!transactionId || !pin || !role) {
       return res.status(400).json({ success: false, error: 'Missing transactionId, pin, or role' });
@@ -23,8 +23,17 @@ const verifyEscrowPin = async (req, res, next) => {
       }
 
       const tx = snap.data();
-      const cleanPin = pin.toString().trim();
 
+      // Verify the caller is actually the tenant or landlord on this transaction
+      // — don't trust the role they declare, verify it against the transaction.
+      if (role === 'tenant' && tx.tenantId !== uid) {
+        throw new Error('Unauthorized: You are not the tenant on this transaction.');
+      }
+      if (role === 'landlord' && tx.landlordId !== uid) {
+        throw new Error('Unauthorized: You are not the landlord on this transaction.');
+      }
+
+      const cleanPin = pin.toString().trim();
       let tenantPinVerified = tx.tenantPinVerified || false;
       let landlordPinVerified = tx.landlordPinVerified || false;
 

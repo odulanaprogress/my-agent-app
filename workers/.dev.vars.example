@@ -1,0 +1,6 @@
+# Local development variables — DO NOT COMMIT THIS FILE
+# Copy this file to .dev.vars and fill in your real values for local testing
+
+FLUTTERWAVE_SECRET_KEY=FLWSECK_TEST-your-secret-key-here
+FIREBASE_PROJECT_ID=your-firebase-project-id
+ALLOWED_ORIGIN=http://localhost:3000

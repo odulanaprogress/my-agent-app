@@ -130,7 +130,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
 
     if (!mounted) return;
 
-    final currentUser = ref.read(currentUserProvider);
     final amountController = TextEditingController(text: availableBalance > 0 ? availableBalance.toString() : '');
     final accountController = TextEditingController();
     String selectedBankCode = '058';
@@ -395,21 +394,15 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                                 transferError = null;
                               });
                               try {
-                                await EscrowApiService().disburseLandlordPayout(
-                                  transactionId: 'WITHDRAW_${DateTime.now().millisecondsSinceEpoch}',
+                                // Server validates real balance, executes transfer,
+                                // and decrements wallet atomically.
+                                // Client never touches Flutterwave directly.
+                                await EscrowApiService().requestWithdrawal(
                                   amount: amt,
                                   bankCode: selectedBankCode,
                                   accountNumber: acct,
                                 );
-
-                                // Deduct balance in Firestore
-                                if (currentUser != null) {
-                                  await WalletRepository(FirebaseFirestore.instance).incrementBalance(
-                                    uid: currentUser.uid,
-                                    delta: -amt,
-                                    updatedAt: DateTime.now(),
-                                  );
-                                }
+                                // Balance update is handled server-side — no client write needed.
 
                                 Navigator.pop(modalCtx);
                                 if (context.mounted) {
@@ -501,7 +494,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               try {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Syncing wallet...')));
                 final txs = await FirebaseFirestore.instance.collection('transactions')
-                    .where('landlordId', isEqualTo: currentUser!.uid)
+                    .where('landlordId', isEqualTo: currentUser.uid)
                     .get();
                 
                 int totalReleased = 0;
@@ -513,7 +506,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   }
                 }
 
-                await FirebaseFirestore.instance.collection('wallets').doc(currentUser!.uid).set({
+                await FirebaseFirestore.instance.collection('wallets').doc(currentUser.uid).set({
                   'availableBalance': totalReleased,
                   'balance': totalReleased,
                   'updatedAt': Timestamp.now(),

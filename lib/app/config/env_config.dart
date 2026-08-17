@@ -2,7 +2,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class EnvConfig {
   // =====================
-  // PAYSTACK
+  // PAYSTACK (public key only — safe for client)
   // =====================
 
   static String get paystackPublicKey =>
@@ -10,15 +10,7 @@ class EnvConfig {
       const String.fromEnvironment('PAYSTACK_PUBLIC_KEY');
 
   // =====================
-  // OPENAI
-  // =====================
-
-  static String get openAIApiKey =>
-      dotenv.env['OPENAI_API_KEY'] ??
-      const String.fromEnvironment('OPENAI_API_KEY');
-
-  // =====================
-  // CLOUDINARY
+  // CLOUDINARY (public key + unsigned preset — safe for client)
   // =====================
 
   static String get cloudinaryCloudName =>
@@ -30,19 +22,16 @@ class EnvConfig {
       const String.fromEnvironment('CLOUDINARY_UPLOAD_PRESET');
 
   // =====================
-  // FLUTTERWAVE
+  // FLUTTERWAVE (public key only — safe for client)
   // =====================
 
   static String get flutterwavePublicKey =>
       dotenv.env['FLUTTERWAVE_PUBLIC_KEY'] ??
       const String.fromEnvironment('FLUTTERWAVE_PUBLIC_KEY');
 
-  static String get flutterwaveSecretKey =>
-      dotenv.env['FLUTTERWAVE_SECRET_KEY'] ??
-      const String.fromEnvironment('FLUTTERWAVE_SECRET_KEY');
-
-  static String get flutterwaveEncryptionKey =>
-      dotenv.env['FLUTTERWAVE_ENCRYPTION_KEY'] ??
-      const String.fromEnvironment('FLUTTERWAVE_ENCRYPTION_KEY');
+  // NOTE: FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_ENCRYPTION_KEY, and
+  // OPENAI_API_KEY are intentionally NOT exposed here.
+  // They live exclusively in Cloudflare Workers environment secrets.
+  // Any feature needing them must call the Workers API with a Firebase token.
 }
 

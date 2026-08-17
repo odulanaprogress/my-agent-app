@@ -1,43 +1,31 @@
-import 'dart:convert';
+import '../network/api_client.dart';
+import '../utils/app_exception.dart';
 
-import 'package:http/http.dart' as http;
-
-import '../config/ai_config.dart';
-
+/// AI Service — routes all OpenAI calls through the Cloudflare Workers API.
+/// The OpenAI key never touches the Flutter client.
+///
+/// To enable this, add a /ai/chat endpoint to workers/src/handlers/
+/// that forwards the message to OpenAI using the server-side key.
+/// Until then, this service throws a clear error rather than exposing the key.
 class AIService {
   Future<String> sendMessage(String message) async {
-    final response = await http.post(
-      Uri.parse('https://api.openai.com/v1/chat/completions'),
-      headers: {
-        'Authorization': 'Bearer ${AIConfig.apiKey}',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': 'gpt-4.1-mini',
-        'messages': [
-          {
-            'role': 'system',
-            'content': '''
-You are AGENT AI assistant.
+    try {
+      // Route through Cloudflare Workers — OpenAI key stays on server
+      final res = await ApiClient.workerPost('/ai/chat', {
+        'message': message,
+      });
 
-You help users with:
-- finding properties
-- payments
-- verification
-- escrow system
-- landlord support
-- tenant support
+      if (res is Map && res['reply'] != null) {
+        return res['reply'].toString();
+      }
 
-Keep responses short and helpful.
-''',
-          },
-          {'role': 'user', 'content': message},
-        ],
-      }),
-    );
-
-    final data = jsonDecode(response.body);
-
-    return (data['choices']?.first?['message']?['content'] ?? '') as String;
+      return res['choices']?.first?['message']?['content']?.toString() ?? '';
+    } catch (e) {
+      // If the Workers /ai/chat endpoint hasn't been set up yet,
+      // return a graceful fallback message rather than crashing.
+      throw AppException(
+        'AI assistant is temporarily unavailable. Please try again later.',
+      );
+    }
   }
 }

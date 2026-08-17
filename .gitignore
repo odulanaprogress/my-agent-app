@@ -21,6 +21,11 @@ node_modules/
 .env.*
 !.env.example
 web/.env
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+scratch/
 google-services.json
 GoogleService-Info.plist
 

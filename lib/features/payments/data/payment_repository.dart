@@ -224,14 +224,15 @@ class PaymentRepository {
           amount: netPayoutInt,
         );
 
-        // Credit Landlord available balance in Firestore wallet
+        // Wallet credit is handled server-side by the backend escrowController
+        // or Cloud Functions verifyEscrowPin — both use Admin SDK.
+        // Trigger backend settle endpoint to credit landlord wallet server-side:
         final landlordId = data['landlordId'] as String?;
         if (landlordId != null && landlordId.isNotEmpty && netPayoutInt > 0) {
-          _firestore.collection('wallets').doc(landlordId).set({
-            'availableBalance': FieldValue.increment(netPayoutInt),
-            'balance': FieldValue.increment(netPayoutInt),
-            'updatedAt': Timestamp.now(),
-          }, SetOptions(merge: true));
+          _apiService.settleFlutterwaveEscrow(
+            transactionId: transactionId,
+            amount: netPayoutInt,
+          );
         }
 
         // Generate official Tenancy Agreement record & notify Tenant

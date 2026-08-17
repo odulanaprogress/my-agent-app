@@ -1,9 +1,9 @@
-import 'package:agent_app/app/config/env_config.dart';
+// OpenAI API key must NOT be exposed on the client.
+// Route all AI calls through your Cloudflare Workers or backend endpoint.
+// See: workers/src/handlers/ for where to add an AI proxy endpoint.
 
 class AIConfig {
-  /// OpenAI API key injected at runtime using `--dart-define=OPENAI_API_KEY=...`
-  ///
-  /// NOTE: Still not ideal to ship raw keys in the mobile app—production
-  /// deployments should proxy requests via a backend.
-  static final String apiKey = EnvConfig.openAIApiKey;
+  // intentionally empty — no client-side API keys
+  // If you need AI features, add a /ai/chat endpoint to the Workers
+  // and call it with a Firebase token like all other secure endpoints.
 }

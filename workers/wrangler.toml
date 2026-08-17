@@ -1,0 +1,12 @@
+name = "agent-api"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Non-secret config — safe to put here
+# ALLOWED_ORIGIN and FIREBASE_PROJECT_ID are set as secrets in the Cloudflare dashboard
+# FLUTTERWAVE_SECRET_KEY is set as a secret in the Cloudflare dashboard
+
+# For local development with wrangler dev:
+# Copy .dev.vars.example to .dev.vars and fill in values

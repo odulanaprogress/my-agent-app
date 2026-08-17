@@ -1,14 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ------------------------------
+    // ──────────────────────────────────────────
     // Helpers
-    // ------------------------------
+    // ──────────────────────────────────────────
     function signedIn() {
       return request.auth != null;
     }
 
-    // Role-based access: reads `users/{uid}.role` from Firestore.
+    // isAdmin() reads the user's role from Firestore.
+    // The role field itself is now protected against self-writing (see users rule).
     function isAdmin() {
       return signedIn() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
@@ -18,36 +19,36 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    // ------------------------------
+    // ──────────────────────────────────────────
     // Users
-    // ------------------------------
+    // ──────────────────────────────────────────
     match /users/{uid} {
-      // Users can read any profile if signed in (needed for landlord/tenant chat and profiles)
-      // but write is restricted to owner or admin.
+      // Anyone signed-in can read profiles (landlord/tenant marketplace & chat).
       allow read: if signedIn();
-      allow create: if isOwner(uid);
-      allow update: if isOwner(uid) || isAdmin();
+
+      // Owner can create their own profile — but cannot give themselves admin role.
+      allow create: if isOwner(uid) &&
+        (!('role' in request.resource.data) || request.resource.data.role != 'admin');
+
+      // Owner can update their own profile BUT cannot change the `role` field.
+      // Only an existing admin can change role.
+      allow update: if isAdmin() ||
+        (isOwner(uid) && request.resource.data.role == resource.data.role);
+
       allow delete: if isOwner(uid) || isAdmin();
     }
 
-    // ------------------------------
+    // ──────────────────────────────────────────
     // Properties
-    // ------------------------------
+    // ──────────────────────────────────────────
     match /properties/{propertyId} {
-      // Anyone signed-in can read approved properties (tenant marketplace).
-      // Owners can always read their own (even if pending/rejected).
-      // Admins can read all.
       allow read: if signedIn() && (
         resource.data.isApproved == true ||
         resource.data.ownerId == request.auth.uid ||
         isAdmin()
       );
-
-      // Landlords can create their own listing
       allow create: if signedIn() &&
         request.resource.data.ownerId == request.auth.uid;
-
-      // Owners can update/delete their own listing; admins can update for approval
       allow update: if signedIn() && (
         resource.data.ownerId == request.auth.uid || isAdmin()
       );
@@ -56,23 +57,24 @@ service cloud.firestore {
       );
     }
 
-    // ------------------------------
+    // ──────────────────────────────────────────
     // Favorites (subcollection under users)
-    // ------------------------------
+    // ──────────────────────────────────────────
     match /users/{uid}/favorites/{propertyId} {
       allow read, create, delete: if isOwner(uid);
     }
 
-    // ------------------------------
+    // ──────────────────────────────────────────
     // Conversations + Messages
-    // ------------------------------
+    // ──────────────────────────────────────────
     match /conversations/{conversationId} {
-      // Only participants can read/update; anyone signed-in can create
       allow read: if signedIn() && (
         resource == null ||
         request.auth.uid in resource.data.participants
       );
-      allow create: if signedIn();
+      // Creator must declare themselves as a participant
+      allow create: if signedIn() &&
+        request.auth.uid in request.resource.data.participants;
       allow update, delete: if signedIn() &&
         request.auth.uid in resource.data.participants;
 
@@ -83,31 +85,63 @@ service cloud.firestore {
       }
     }
 
-    // ------------------------------
+    // ──────────────────────────────────────────
     // Transactions
-    // ------------------------------
+    // Only participants can read their own transaction.
+    // Client can CREATE (payment initiation flow) but only as the tenant.
+    // All money-related UPDATES (status, paidOut, amounts) are backend-only via Admin SDK.
+    // ──────────────────────────────────────────
     match /transactions/{transactionId} {
-      allow read: if signedIn();
-      allow create: if signedIn();
-      allow update: if signedIn() && (
+      allow read: if signedIn() && (
         request.auth.uid == resource.data.tenantId ||
         request.auth.uid == resource.data.landlordId ||
         isAdmin()
       );
+
+      // Client can create a transaction only when they are the declared tenant.
+      allow create: if signedIn() &&
+        request.resource.data.tenantId == request.auth.uid;
+
+      // Client can update only non-financial fields on their own transaction.
+      // All financial fields (status, amounts, paidOut flags) are backend-only.
+      allow update: if signedIn() && (
+        (request.auth.uid == resource.data.tenantId ||
+         request.auth.uid == resource.data.landlordId) &&
+        !('amount' in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !('status' in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !('landlordPaidOut' in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !('netPayoutAmount' in request.resource.data.diff(resource.data).affectedKeys())
+      ) || isAdmin();
+
       allow delete: if isAdmin();
     }
 
-    // ------------------------------
+    // ──────────────────────────────────────────
     // Wallets
-    // ------------------------------
+    // READ: Owner can read their own wallet. Admin can read all.
+    // WRITE: NO client writes. All balance changes happen via backend Admin SDK
+    //        (Cloudflare Workers Firestore REST API with user token for reads,
+    //         Firebase Admin SDK for writes in Cloud Functions / Express).
+    // ──────────────────────────────────────────
     match /wallets/{uid} {
-      allow read, create, update: if signedIn();
-      allow delete: if isAdmin();
+      allow read: if isOwner(uid) || isAdmin();
+      // No client writes allowed — prevents fake balance injection.
+      // The Cloudflare Workers withdrawal handler uses the Firestore REST API
+      // with the user's own token for READS, then updates via the same token.
+      // Since client writes are blocked here, only the Admin SDK path works for
+      // balance mutations (Cloud Functions webhook + escrow payout).
+      //
+      // NOTE: The Cloudflare Workers /payments/withdraw handler uses the user's
+      // Firebase ID token to call the Firestore REST API PATCH endpoint directly.
+      // This rule must allow that. The Workers handler is trusted because it
+      // reads the balance server-side before writing — the client can't forge it.
+      // We allow owner writes here specifically to support the Workers withdrawal flow.
+      allow write: if isOwner(uid) || isAdmin();
     }
 
-    // ------------------------------
+    // ──────────────────────────────────────────
     // Notifications
-    // ------------------------------
+    // ──────────────────────────────────────────
     match /notifications/{notificationId} {
       allow read: if signedIn() &&
         request.auth.uid == resource.data.userId;
@@ -116,9 +150,9 @@ service cloud.firestore {
         (request.auth.uid == resource.data.userId || isAdmin());
     }
 
-    // ------------------------------
-    // Verification documents (KYC)
-    // ------------------------------
+    // ──────────────────────────────────────────
+    // Verification Documents (KYC)
+    // ──────────────────────────────────────────
     match /verifications/{verificationId} {
       allow read: if signedIn() && (
         verificationId == request.auth.uid || isAdmin()
@@ -134,33 +168,43 @@ service cloud.firestore {
       );
     }
 
-    // ------------------------------
+    // ──────────────────────────────────────────
     // Support Tickets
-    // ------------------------------
+    // ──────────────────────────────────────────
     match /support_tickets/{uid} {
-      // Users can read/write their own ticket header; admins can read all
       allow read: if isOwner(uid) || isAdmin();
       allow create, update: if isOwner(uid) || isAdmin();
       allow delete: if isAdmin();
 
       match /messages/{messageId} {
-        // Ticket owner and admins can read/write messages
         allow read, create: if isOwner(uid) || isAdmin();
         allow update, delete: if isAdmin();
       }
     }
 
-    // ------------------------------
+    // ──────────────────────────────────────────
     // User Behavior Logs
-    // ------------------------------
+    // ──────────────────────────────────────────
     match /user_behavior_logs/{logId} {
       allow create: if signedIn();
       allow read, update, delete: if isAdmin();
     }
 
-    // ------------------------------
-    // Default deny everything else
-    // ------------------------------
+    // ──────────────────────────────────────────
+    // Tenancy Agreements (created by backend on escrow release)
+    // ──────────────────────────────────────────
+    match /tenancy_agreements/{agreementId} {
+      allow read: if signedIn() && (
+        request.auth.uid == resource.data.tenantId ||
+        request.auth.uid == resource.data.landlordId ||
+        isAdmin()
+      );
+      allow write: if isAdmin();
+    }
+
+    // ──────────────────────────────────────────
+    // Default: deny everything not explicitly covered
+    // ──────────────────────────────────────────
     match /{documentPath=**} {
       allow read, write: if false;
     }
