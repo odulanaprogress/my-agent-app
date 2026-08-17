@@ -16,7 +16,7 @@
  * The Firestore REST API is secured by Firebase rules OR by using a service
  * account key. We use the service account approach here.
  */
-import { requireAuth, AuthError } from '../auth.js';
+import { requireAuth, AuthError, getGcpAccessToken } from '../auth.js';
 import { executePayout } from '../flutterwave.js';
 
 const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1';
@@ -134,8 +134,10 @@ export async function handleWithdraw(request, env) {
 
   // 3. Read the real wallet balance from Firestore (server-side, can't be forged)
   let walletDoc;
+  let gcpToken;
   try {
-    walletDoc = await getFirestoreDoc(projectId, 'wallets', uid, rawToken);
+    gcpToken = await getGcpAccessToken(env);
+    walletDoc = await getFirestoreDoc(projectId, 'wallets', uid, gcpToken);
   } catch (err) {
     return jsonError(`Unable to read wallet: ${err.message}`, 500);
   }
@@ -164,7 +166,7 @@ export async function handleWithdraw(request, env) {
         availableBalance: newBalance,
         balance: newBalance,
       },
-      rawToken
+      gcpToken
     );
   } catch (err) {
     return jsonError(`Unable to reserve balance: ${err.message}`, 500);
@@ -194,7 +196,7 @@ export async function handleWithdraw(request, env) {
           availableBalance: availableBalance,
           balance: availableBalance,
         },
-        rawToken
+        gcpToken
       );
     } catch (refundErr) {
       // Critical: balance was deducted but payout failed and refund failed

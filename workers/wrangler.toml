@@ -6,7 +6,16 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 # Non-secret config — safe to put here
 # ALLOWED_ORIGIN and FIREBASE_PROJECT_ID are set as secrets in the Cloudflare dashboard
-# FLUTTERWAVE_SECRET_KEY is set as a secret in the Cloudflare dashboard
+# FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_SECRET_HASH, GCP_SERVICE_ACCOUNT_EMAIL,
+# and GCP_SERVICE_ACCOUNT_KEY are all set as secrets in the Cloudflare dashboard
+# (never in this file — it's committed to the repo).
 
 # For local development with wrangler dev:
 # Copy .dev.vars.example to .dev.vars and fill in values
+
+# Rate-limit storage for /payments/withdraw and /escrow/verify-pin.
+# Create with: wrangler kv:namespace create RATE_LIMIT_KV
+# then paste the returned id below.
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"

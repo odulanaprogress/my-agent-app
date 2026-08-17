@@ -249,13 +249,101 @@ export async function requireAuth(request, projectId) {
   }
 }
 
-/**
- * Custom error class for auth failures — signals a 401 response.
- */
 export class AuthError extends Error {
   constructor(message, statusCode = 401) {
     super(message);
     this.name = 'AuthError';
     this.statusCode = statusCode;
   }
+}
+
+// --- GCP Service Account Token Minting ---
+
+const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const SCOPE = 'https://www.googleapis.com/auth/datastore';
+
+let cachedToken = null;
+let cachedExpiry = 0;
+
+function base64urlFromString(str) {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64urlFromBytes(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function importPrivateKey(pem) {
+  const pemBody = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+  const binaryDer = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
+  return await crypto.subtle.importKey(
+    'pkcs8',
+    binaryDer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+}
+
+export async function getGcpAccessToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedToken && now < cachedExpiry - 60) {
+    return cachedToken;
+  }
+
+  if (!env.GCP_SERVICE_ACCOUNT_EMAIL || !env.GCP_SERVICE_ACCOUNT_KEY) {
+    throw new Error(
+      'GCP_SERVICE_ACCOUNT_EMAIL / GCP_SERVICE_ACCOUNT_KEY are not configured as Worker secrets.'
+    );
+  }
+
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const claims = {
+    iss: env.GCP_SERVICE_ACCOUNT_EMAIL,
+    scope: SCOPE,
+    aud: TOKEN_URL,
+    exp: now + 3600,
+    iat: now,
+  };
+
+  const encodedHeader = base64urlFromString(JSON.stringify(header));
+  const encodedClaims = base64urlFromString(JSON.stringify(claims));
+  const signingInput = `${encodedHeader}.${encodedClaims}`;
+
+  // Replace escaped newlines if they were stored that way in Cloudflare secrets
+  const rawKey = env.GCP_SERVICE_ACCOUNT_KEY.replace(/\\n/g, '\n');
+  const key = await importPrivateKey(rawKey);
+  const signatureBuf = await crypto.subtle.sign(
+    { name: 'RSASSA-PKCS1-v1_5' },
+    key,
+    new TextEncoder().encode(signingInput)
+  );
+
+  const jwt = `${signingInput}.${base64urlFromBytes(new Uint8Array(signatureBuf))}`;
+
+  const tokenRes = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    const errText = await tokenRes.text();
+    throw new Error(`Failed to mint service account token: ${errText}`);
+  }
+
+  const tokenJson = await tokenRes.json();
+  cachedToken = tokenJson.access_token;
+  cachedExpiry = now + (tokenJson.expires_in || 3600);
+  return cachedToken;
 }
