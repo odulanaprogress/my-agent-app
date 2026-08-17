@@ -2,8 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/message_model.dart';
-import '../../../core/services/onesignal_api_service.dart';
 import '../../notifications/repositories/notification_repository.dart';
+import '../../../core/network/api_client.dart';
 
 class ChatRepository {
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
@@ -59,12 +59,24 @@ class ChatRepository {
     final senderDoc = await firestore.collection('users').doc(currentUser.uid).get();
     final senderName = senderDoc.data()?['fullName'] ?? 'User';
 
-    await OneSignalApiService.sendChatMessageNotification(
-      senderName: senderName,
-      messageText: message,
-      receiverUid: receiverId,
-      conversationId: conversationId,
-    );
+    // Trigger server-side push notification — OneSignal key stays on the backend
+    try {
+      final idToken = await auth.currentUser?.getIdToken();
+      if (idToken != null) {
+        await ApiClient.post(
+          '/notify/message',
+          {
+            'conversationId': conversationId,
+            'receiverId': receiverId,
+            'senderName': senderName,
+            'messageType': 'text',
+            'messagePreview': message.length > 80 ? message.substring(0, 77) + '...' : message,
+          },
+        );
+      }
+    } catch (_) {
+      // Notification failure is non-fatal — message was already saved
+    }
 
     // Create in-app notification
     await NotificationRepository().createNotification(

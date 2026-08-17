@@ -8,6 +8,7 @@ const bankRoutes = require('./routes/bankRoutes');
 const escrowRoutes = require('./routes/escrowRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -77,6 +78,7 @@ app.use('/api/escrow/verify-pin', pinRateLimiter); // tight limit on PIN endpoin
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/notify', notificationRoutes);
 
 // ── 404 ──────────────────────────────────────────────────────────────────────
 app.use('*', (req, res) => {
