@@ -2,11 +2,32 @@ const { db } = require('../config/firebase');
 const { sendPushNotification } = require('../services/onesignalService');
 
 /**
+ * Helper to save in-app notification to Firestore for the user's notification screen.
+ */
+const saveInAppNotification = async ({ userId, title, message, type = 'system', targetId = '' }) => {
+  try {
+    if (!userId) return;
+    await db.collection('notifications').add({
+      userId,
+      title,
+      message,
+      body: message,
+      type,
+      targetId,
+      isRead: false,
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    console.error('Failed to save in-app notification to Firestore:', err.message);
+  }
+};
+
+/**
  * POST /api/notify/message
  * Called by Flutter after a chat message is saved to Firestore.
- * Sends a push notification to the receiver.
+ * Sends a push notification to the receiver and records in-app notification.
  *
- * Body: { conversationId, receiverId, senderName, messageType }
+ * Body: { conversationId, receiverId, senderName, messageType, messagePreview }
  * Auth: Required (Firebase ID token via requireAuth middleware)
  */
 const notifyNewMessage = async (req, res, next) => {
@@ -31,14 +52,25 @@ const notifyNewMessage = async (req, res, next) => {
       default:      notificationText = messagePreview || 'Sent you a message';
     }
 
-    // Trim preview for privacy (don't expose full message in push)
     if (notificationText.length > 80) {
       notificationText = notificationText.substring(0, 77) + '...';
     }
 
+    const title = `New message from ${senderName || 'Someone'}`;
+
+    // 1. Save in-app notification for notifications screen
+    await saveInAppNotification({
+      userId: receiverId,
+      title,
+      message: notificationText,
+      type: 'chat',
+      targetId: conversationId,
+    });
+
+    // 2. Dispatch OneSignal push
     await sendPushNotification({
       userId: receiverId,
-      title: `New message from ${senderName || 'Someone'}`,
+      title,
       message: notificationText,
       data: { type: 'chat', conversationId },
     });
@@ -51,11 +83,10 @@ const notifyNewMessage = async (req, res, next) => {
 
 /**
  * POST /api/notify/property
- * Called internally (or by admin flow) when a property approval status changes.
- * Sends a push notification to the property owner.
+ * Sends a push notification to the property owner when approved/rejected.
  *
  * Body: { propertyId, ownerId, propertyTitle, approvalStatus }
- * Auth: Required (Firebase ID token — admin only in practice)
+ * Auth: Required
  */
 const notifyPropertyUpdate = async (req, res, next) => {
   try {
@@ -65,20 +96,30 @@ const notifyPropertyUpdate = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Missing propertyId, ownerId, or approvalStatus' });
     }
 
-    const title = propertyTitle || 'Your property';
+    const title = 'Property Update';
     let message;
 
     if (approvalStatus === 'approved') {
-      message = `✅ "${title}" has been approved and is now live.`;
+      message = `✅ "${propertyTitle || 'Your property'}" has been approved and is now live.`;
     } else if (approvalStatus === 'rejected') {
-      message = `❌ "${title}" was not approved. Please review our guidelines and resubmit.`;
+      message = `❌ "${propertyTitle || 'Your property'}" was not approved. Please review our guidelines and resubmit.`;
     } else {
       return res.status(400).json({ success: false, error: `Unrecognised approvalStatus: ${approvalStatus}` });
     }
 
+    // 1. Save in-app notification
+    await saveInAppNotification({
+      userId: ownerId,
+      title,
+      message,
+      type: 'property_status',
+      targetId: propertyId,
+    });
+
+    // 2. Dispatch push
     await sendPushNotification({
       userId: ownerId,
-      title: 'Property Update',
+      title,
       message,
       data: { type: 'property_status', propertyId },
     });
@@ -90,27 +131,54 @@ const notifyPropertyUpdate = async (req, res, next) => {
 };
 
 /**
- * POST /api/notify/generic
- * General-purpose server-triggered push notification.
- * Only callable by verified users — body must include target userId.
+ * POST /api/notify/generic & /api/notify/push
+ * General-purpose server-triggered push and in-app notification.
+ * Accepts both single userId and array receiverUids, and both title/heading, message/content.
  *
- * Body: { userId, title, message, data }
+ * Body: { userId, receiverUids, title, heading, message, content, data }
  * Auth: Required
  */
 const notifyGeneric = async (req, res, next) => {
   try {
-    const { userId, title, message, data = {} } = req.body;
+    const { userId, receiverUids, title, heading, message, content, data = {} } = req.body;
 
-    if (!userId || !title || !message) {
-      return res.status(400).json({ success: false, error: 'Missing userId, title, or message' });
+    const notifTitle = title || heading;
+    const notifMessage = message || content;
+    const targets = (receiverUids && Array.isArray(receiverUids) && receiverUids.length > 0)
+      ? receiverUids
+      : (userId ? [userId] : []);
+
+    if (!targets.length || !notifTitle || !notifMessage) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing recipient (userId or receiverUids), title/heading, or message/content',
+      });
     }
 
-    await sendPushNotification({ userId, title, message, data });
+    // 1. Save in-app notification for each target user in Firestore
+    for (const targetUid of targets) {
+      await saveInAppNotification({
+        userId: targetUid,
+        title: notifTitle,
+        message: notifMessage,
+        type: data.type || 'system',
+        targetId: data.targetId || data.conversationId || '',
+      });
+    }
 
-    return res.status(200).json({ success: true });
+    // 2. Send push notifications via OneSignal
+    await sendPushNotification({
+      userIds: targets,
+      title: notifTitle,
+      message: notifMessage,
+      data,
+    });
+
+    return res.status(200).json({ success: true, recipientsCount: targets.length });
   } catch (error) {
     next(error);
   }
 };
 
 module.exports = { notifyNewMessage, notifyPropertyUpdate, notifyGeneric };
+

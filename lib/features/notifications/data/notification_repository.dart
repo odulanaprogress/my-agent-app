@@ -88,7 +88,7 @@ class NotificationItem {
 
   static DateTime _parseDate(dynamic value) {
     if (value == null) {
-      return DateTime.fromMillisecondsSinceEpoch(0);
+      return DateTime.now();
     }
     if (value is Timestamp) {
       return value.toDate();
@@ -96,7 +96,7 @@ class NotificationItem {
     if (value is DateTime) {
       return value;
     }
-    return DateTime.fromMillisecondsSinceEpoch(0);
+    return DateTime.now();
   }
 
   factory NotificationItem.fromMap(Map<String, dynamic> map, String id) {
