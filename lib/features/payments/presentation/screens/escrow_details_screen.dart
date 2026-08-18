@@ -558,7 +558,12 @@ class EscrowDetailsScreen extends ConsumerWidget {
                                 .collection('pins')
                                 .doc(currentUser?.uid ?? '')
                                 .get()
-                                .then((doc) => doc.exists ? doc.data()?['pin'] as String? : null),
+                                .then((doc) {
+                                  if (doc.exists && doc.data() != null) {
+                                    return doc.data()!['pin'] as String?;
+                                  }
+                                  return null;
+                                }),
                             builder: (context, pinSnapshot) {
                               final myPin = pinSnapshot.data;
                               return Container(
