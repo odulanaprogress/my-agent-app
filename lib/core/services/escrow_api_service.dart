@@ -119,7 +119,7 @@ class EscrowApiService {
     required String accountNumber,
     required String bankCode,
   }) async {
-    final res = await ApiClient.workerPost('/bank/resolve', {
+    final res = await ApiClient.post('/bank/resolve', {
       'accountNumber': accountNumber.trim(),
       'bankCode': bankCode.trim(),
     });

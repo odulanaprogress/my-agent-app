@@ -36,6 +36,10 @@ export async function handleBankResolve(request, env) {
     return jsonError('accountNumber must be a 10-digit NUBAN', 400);
   }
 
+  if (!env.FLUTTERWAVE_SECRET_KEY) {
+    return jsonError('Configuration error: Missing FLUTTERWAVE_SECRET_KEY in worker environment', 500);
+  }
+
   try {
     const result = await resolveBankAccount({ accountNumber, bankCode }, env.FLUTTERWAVE_SECRET_KEY);
     return jsonOk({ data: result });
