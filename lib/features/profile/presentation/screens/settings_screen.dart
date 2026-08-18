@@ -65,14 +65,10 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ] else if (role == 'landlord') ...[
             SettingsTile(
-              icon: Icons.monetization_on_outlined,
-              title: 'Payout Settings',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Landlord Bank settings coming soon.')),
-                );
-              },
+              icon: Icons.account_balance_outlined,
+              title: 'Bank Account & Payout Setup',
+              subtitle: 'Verify your account for payouts',
+              onTap: () => context.push('/bank-setup'),
             ),
           ] else if (role == 'admin') ...[
             SettingsTile(

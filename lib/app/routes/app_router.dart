@@ -49,6 +49,7 @@ import '../../features/search/presentation/screens/property_detail_view_screen.d
 import '../../features/notifications/presentation/screens/messaging_screen.dart';
 import '../../features/payments/presentation/screens/payment_method_screen.dart';
 import '../../features/ai/screens/ai_chat_screen.dart';
+import '../../features/payments/screens/bank_account_setup_screen.dart';
 import '../../features/admin/screens/customer_support_dashboard_screen.dart';
 import '../../features/admin/screens/admin_behavior_logs_screen.dart';
 import '../../features/legal/presentation/screens/tenancy_agreement_screen.dart';
@@ -64,6 +65,7 @@ const _protectedPaths = {
   '/favorites',
   '/profile',
   '/edit-profile',
+  '/bank-setup',
   '/conversations',
   '/wallet',
   '/escrow',
@@ -180,6 +182,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/edit-profile',
         builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: '/bank-setup',
+        builder: (context, state) => const BankAccountSetupScreen(),
       ),
       GoRoute(
         path: '/tenant',
