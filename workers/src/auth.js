@@ -116,10 +116,12 @@ function parseJwt(token) {
  * @returns {Promise<{uid: string, email: string|undefined, [key: string]: any}>}
  * @throws {Error} if token is invalid, expired, or from wrong project
  */
-export async function verifyFirebaseToken(token, projectId) {
+export async function verifyFirebaseToken(token, projectId = 'agent-app-67bc4') {
   if (!token) {
     throw new Error('No token provided');
   }
+
+  const targetProject = (projectId && projectId.trim().length > 0) ? projectId.trim() : 'agent-app-67bc4';
 
   let parsed;
   try {
@@ -147,12 +149,12 @@ export async function verifyFirebaseToken(token, projectId) {
   }
 
   // 4. Check audience (must be your Firebase project ID)
-  if (payload.aud !== projectId) {
+  if (payload.aud !== targetProject) {
     throw new Error(`Invalid token audience: ${payload.aud}`);
   }
 
   // 5. Check issuer
-  const expectedIssuer = `https://securetoken.google.com/${projectId}`;
+  const expectedIssuer = `https://securetoken.google.com/${targetProject}`;
   if (payload.iss !== expectedIssuer) {
     throw new Error(`Invalid token issuer: ${payload.iss}`);
   }
@@ -241,9 +243,10 @@ export async function requireAuth(request, projectId) {
   }
 
   const token = authHeader.slice(7); // Remove "Bearer "
+  const targetProject = (projectId && projectId.trim().length > 0) ? projectId.trim() : 'agent-app-67bc4';
 
   try {
-    return await verifyFirebaseToken(token, projectId);
+    return await verifyFirebaseToken(token, targetProject);
   } catch (err) {
     throw new AuthError(`Unauthorized: ${err.message}`, 401);
   }

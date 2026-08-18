@@ -4,10 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 class ApiClient {
-  /// Express backend URL
-  static const String baseUrl = kReleaseMode
-      ? 'https://my-agent-app-backend.vercel.app/api'
-      : 'http://localhost:5000/api';
+  /// Express backend URL (always points to deployed Vercel backend)
+  static const String baseUrl = 'https://my-agent-app-backend.vercel.app/api';
 
   /// Cloudflare Workers secure API — handles all Flutterwave calls
   static const String workersUrl = 'https://agent-api.odulanaprogress.workers.dev';

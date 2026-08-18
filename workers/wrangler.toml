@@ -5,10 +5,8 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 # Non-secret config — safe to put here
-# ALLOWED_ORIGIN and FIREBASE_PROJECT_ID are set as secrets in the Cloudflare dashboard
-# FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_SECRET_HASH, GCP_SERVICE_ACCOUNT_EMAIL,
-# and GCP_SERVICE_ACCOUNT_KEY are all set as secrets in the Cloudflare dashboard
-# (never in this file — it's committed to the repo).
+FIREBASE_PROJECT_ID = "agent-app-67bc4"
+ALLOWED_ORIGIN = "https://my-agent-app-teal.vercel.app"
 
 # For local development with wrangler dev:
 # Copy .dev.vars.example to .dev.vars and fill in values
