@@ -1,20 +1,21 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import '../../features/notifications/data/notification_repository.dart';
+import '../network/api_client.dart';
 
+/// Sends push notifications exclusively through the secure Express backend.
+/// The ONESIGNAL_REST_API_KEY NEVER lives in the client — it is a server-side
+/// secret stored only in the backend's Vercel environment variables.
 class OneSignalApiService {
-  static const String _apiUrl = 'https://onesignal.com/api/v1/notifications';
-
-  /// Saves a notification to Firestore and securely sends the push notification.
+  /// Saves a notification to Firestore and sends the push via the secure backend.
   static Future<void> sendNotification({
     required List<String> receiverUids,
     required String heading,
     required String content,
     Map<String, dynamic>? data,
   }) async {
-    // 1) Save to Firestore FIRST so it shows up in the NotificationsScreen
+    // 1) Save to Firestore directly (safe — protected by Firestore rules)
     try {
       final repo = NotificationRepository();
       final type = data != null ? (data['type'] ?? 'system') : 'system';
@@ -32,48 +33,19 @@ class OneSignalApiService {
         );
       }
     } catch (e) {
-      print('OneSignalApiService: Error saving notification to Firestore: $e');
+      // Non-fatal: in-app notification list update failure
     }
 
-    // 2) Send Push via OneSignal
-    final appId = dotenv.env['ONESIGNAL_APP_ID'];
-    final apiKey = dotenv.env['ONESIGNAL_REST_API_KEY'];
-
-    if (appId == null || apiKey == null || appId.isEmpty || apiKey.isEmpty) {
-      print(
-        'OneSignalApiService: Missing API Keys. Push notification not sent.',
-      );
-      return;
-    }
-
+    // 2) Send Push via our secure backend — REST key stays server-side only
     try {
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Basic $apiKey',
-        },
-        body: jsonEncode({
-          'app_id': appId,
-          'target_channel': 'push',
-          'include_aliases': {'external_id': receiverUids},
-          'headings': {'en': heading},
-          'contents': {'en': content},
-          'ios_sound': 'default',
-          'android_sound': 'notification',
-          if (data != null) 'data': data,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        print('OneSignalApiService: Notification sent successfully.');
-      } else {
-        print(
-          'OneSignalApiService: Failed to send notification. Status: ${response.statusCode}, Body: ${response.body}',
-        );
-      }
+      await ApiClient.post('/notify/push', {
+        'receiverUids': receiverUids,
+        'heading': heading,
+        'content': content,
+        if (data != null) 'data': data,
+      });
     } catch (e) {
-      print('OneSignalApiService: Error sending notification: $e');
+      // Non-fatal: push notification failure must not block the app flow
     }
   }
 
@@ -100,11 +72,9 @@ class OneSignalApiService {
   }) async {
     String content = '';
     if (status == 'approved') {
-      content =
-          '✅ Good news! "$propertyTitle" has been approved and is now live.';
+      content = '✅ Good news! "$propertyTitle" has been approved and is now live.';
     } else if (status == 'rejected') {
-      content =
-          '❌ "$propertyTitle" was rejected. Please review our guidelines.';
+      content = '❌ "$propertyTitle" was rejected. Please review our guidelines.';
     } else {
       return;
     }
@@ -139,7 +109,9 @@ class OneSignalApiService {
         data: {'type': 'admin_alert'},
       );
     } catch (e) {
-      print('OneSignalApiService: Error notifying admins: $e');
+      // Non-fatal
     }
   }
 }
+
+

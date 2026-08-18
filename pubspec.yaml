@@ -76,7 +76,9 @@ flutter_native_splash:
 flutter:
   uses-material-design: true
   assets:
-    - .env
+    # NOTE: .env is intentionally NOT listed here.
+    # Secrets must NEVER be bundled into client app binaries.
+    # Runtime config is read from compile-time dart-defines or the server.
     - assets/images/
     - assets/icons/
     - assets/logos/

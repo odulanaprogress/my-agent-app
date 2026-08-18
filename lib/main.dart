@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -8,32 +7,29 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'app/app.dart';
-
 import 'firebase_options.dart';
 
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 
-// NOTE: STEP 28 (FCM) will require pub deps (firebase_messaging + flutter_local_notifications).
-// Those deps currently are not installed in this repo due to dependency conflicts.
-// import 'core/services/push_notification_service.dart';
+// Public IDs — safe to embed in the client binary.
+// These are NOT secrets; they identify the app, not authenticate it.
+const _kOneSignalAppId = String.fromEnvironment(
+  'ONESIGNAL_APP_ID',
+  defaultValue: '6b319216-e8b1-4cc4-826a-ec7c482ff9c4',
+);
+const _kReCaptchaKey = String.fromEnvironment('RECAPTCHA_SITE_KEY', defaultValue: '');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables (tolerant for web/dev)
-  await dotenv.load(fileName: '.env').catchError((_) {});
-
   // Initialize OneSignal (Mobile platforms only)
-  if (!kIsWeb) {
-    final oneSignalAppId = dotenv.env['ONESIGNAL_APP_ID'];
-    if (oneSignalAppId != null && oneSignalAppId.isNotEmpty) {
-      try {
-        OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
-        OneSignal.initialize(oneSignalAppId);
-        OneSignal.Notifications.requestPermission(true);
-      } catch (e) {
-        debugPrint('OneSignal initialization error: $e');
-      }
+  if (!kIsWeb && _kOneSignalAppId.isNotEmpty) {
+    try {
+      OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+      OneSignal.initialize(_kOneSignalAppId);
+      OneSignal.Notifications.requestPermission(true);
+    } catch (e) {
+      debugPrint('OneSignal initialization error: $e');
     }
   }
 
@@ -45,23 +41,17 @@ Future<void> main() async {
   }
 
   // Initialize Firebase App Check for Bot Protection
-  // Web uses debug provider since no reCAPTCHA site key is configured.
-  // To use reCAPTCHA: replace ReCaptchaEnterpriseProvider with your real key.
   try {
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.playIntegrity,
       appleProvider: AppleProvider.appAttest,
-      webProvider: ReCaptchaEnterpriseProvider(
-        dotenv.env['RECAPTCHA_SITE_KEY'] ?? '',
-      ),
+      webProvider: ReCaptchaEnterpriseProvider(_kReCaptchaKey),
     );
   } catch (e) {
     // App Check failure must never block the app from running.
-    // Firebase Auth & Firestore will still work (unenforced mode).
     debugPrint('Firebase App Check skipped: $e');
   }
 
-  // Use the router-based app so onboarding/privacy/auth routing is active.
   runApp(ProviderScope(child: const AgentApp()));
 }
 

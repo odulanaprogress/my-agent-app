@@ -1,37 +1,33 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+// All values here are PUBLIC keys only — safe for client use.
+// They are baked in at build time via --dart-define flags.
+// SECRET keys (Flutterwave secret, OneSignal REST key, Cloudinary API secret)
+// are NEVER placed here — they live exclusively in Cloudflare Worker secrets
+// and the Express backend environment.
 
 class EnvConfig {
   // =====================
   // PAYSTACK (public key only — safe for client)
   // =====================
-
-  static String get paystackPublicKey =>
-      dotenv.env['PAYSTACK_PUBLIC_KEY'] ??
-      const String.fromEnvironment('PAYSTACK_PUBLIC_KEY');
+  static const String paystackPublicKey =
+      String.fromEnvironment('PAYSTACK_PUBLIC_KEY', defaultValue: '');
 
   // =====================
-  // CLOUDINARY (public key + unsigned preset — safe for client)
+  // CLOUDINARY (cloud name + unsigned upload preset — safe for client)
   // =====================
+  static const String cloudinaryCloudName =
+      String.fromEnvironment('CLOUDINARY_CLOUD_NAME', defaultValue: 'dfbzi8cmh');
 
-  static String get cloudinaryCloudName =>
-      dotenv.env['CLOUDINARY_CLOUD_NAME'] ??
-      const String.fromEnvironment('CLOUDINARY_CLOUD_NAME');
-
-  static String get cloudinaryUploadPreset =>
-      dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ??
-      const String.fromEnvironment('CLOUDINARY_UPLOAD_PRESET');
+  static const String cloudinaryUploadPreset =
+      String.fromEnvironment('CLOUDINARY_UPLOAD_PRESET', defaultValue: 'agent_unsigned');
 
   // =====================
-  // FLUTTERWAVE (public key only — safe for client)
+  // FLUTTERWAVE (PUBLIC key only — safe for client)
   // =====================
+  static const String flutterwavePublicKey =
+      String.fromEnvironment('FLUTTERWAVE_PUBLIC_KEY', defaultValue: '');
 
-  static String get flutterwavePublicKey =>
-      dotenv.env['FLUTTERWAVE_PUBLIC_KEY'] ??
-      const String.fromEnvironment('FLUTTERWAVE_PUBLIC_KEY');
-
-  // NOTE: FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_ENCRYPTION_KEY, and
-  // OPENAI_API_KEY are intentionally NOT exposed here.
-  // They live exclusively in Cloudflare Workers environment secrets.
-  // Any feature needing them must call the Workers API with a Firebase token.
+  // NOTE: FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_ENCRYPTION_KEY,
+  // ONESIGNAL_REST_API_KEY, and CLOUDINARY_API_SECRET are intentionally
+  // NOT here. They live exclusively in Cloudflare Worker secrets and
+  // the Express backend .env (server-side only).
 }
-
