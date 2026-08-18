@@ -18,7 +18,18 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 
 // ── CORS — restrict to known origins ────────────────────────────────────────
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',').filter(Boolean);
+// Default origins: localhost for dev + the Flutter web app + the backend itself
+const _defaultOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'https://my-agent-app-teal.vercel.app',
+  'https://my-agent-app-backend.vercel.app',
+];
+const allowedOrigins = [
+  ..._defaultOrigins,
+  ...(process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean),
+];
+
 app.use(
   cors({
     origin: (origin, cb) => {
@@ -30,6 +41,7 @@ app.use(
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
+    credentials: true,
   })
 );
 
