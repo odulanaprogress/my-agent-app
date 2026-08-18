@@ -21,6 +21,7 @@ node_modules/
 .env.*
 !.env.example
 web/.env
+assets/.env
 .dev.vars
 .dev.vars.*
 !.dev.vars.example

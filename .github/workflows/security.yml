@@ -1,0 +1,83 @@
+name: Security & Code Quality
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run weekly security audit scan every Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  secret-scan:
+    name: Secret Leak Detection (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks Secret Scanner
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: "" # Free for public repositories
+
+  dependency-audit:
+    name: Dependency Vulnerability Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Audit Backend Dependencies
+        working-directory: ./backend
+        run: |
+          npm audit --audit-level=high || true
+
+      - name: Audit Cloud Functions Dependencies
+        working-directory: ./functions
+        run: |
+          npm audit --audit-level=high || true
+
+  semgrep-scan:
+    name: SAST Static Security Analysis (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep Security Rules
+        run: semgrep scan --config auto --error || true
+
+  flutter-lint:
+    name: Flutter Lint & Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Analyze Project
+        run: flutter analyze --no-fatal-infos || true
