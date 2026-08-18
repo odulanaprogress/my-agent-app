@@ -1,12 +1,10 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
+import '../../../core/services/onesignal_api_service.dart';
 
 class AdminSecurityDashboardScreen extends StatefulWidget {
   const AdminSecurityDashboardScreen({super.key});
@@ -52,46 +50,16 @@ class _AdminSecurityDashboardScreenState extends State<AdminSecurityDashboardScr
         'ip_address': '${random.nextInt(255)}.${random.nextInt(255)}.${random.nextInt(255)}.${random.nextInt(255)}',
       });
 
-      // 2. Send OneSignal Notification
-      final appId = dotenv.env['ONESIGNAL_APP_ID'];
-      final restApiKey = dotenv.env['ONESIGNAL_REST_API_KEY'];
+      // 2. Send notification through secure backend (REST key is server-side only)
+      await OneSignalApiService.notifyAllAdmins(
+        heading: 'Security Alert: $severity Severity',
+        content: 'Detected $attackType on the platform. Please review the security dashboard.',
+      );
 
-      if (appId != null && restApiKey != null) {
-        final url = Uri.parse('https://onesignal.com/api/v1/notifications');
-        final response = await http.post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Basic $restApiKey',
-          },
-          body: jsonEncode({
-            'app_id': appId,
-            'included_segments': ['Total Subscriptions'],
-            'headings': {'en': 'Security Alert: $severity Severity'},
-            'contents': {'en': 'Detected $attackType on the platform. Please review the security dashboard.'},
-          }),
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Attack simulated and notification sent.')),
         );
-
-        if (response.statusCode == 200) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Attack simulated and notification sent successfully.')),
-            );
-          }
-        } else {
-          debugPrint('OneSignal error: ${response.body}');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Attack simulated but failed to send push notification.')),
-            );
-          }
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Missing OneSignal keys in .env')),
-          );
-        }
       }
     } catch (e) {
       debugPrint('Error simulating attack: $e');

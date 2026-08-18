@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'dart:typed_data';
+import '../../../app/config/env_config.dart';
 
 class ProfileRepository {
   ProfileRepository({
@@ -15,8 +15,8 @@ class ProfileRepository {
   final FirebaseAuth _auth;
   
   late final CloudinaryPublic _cloudinary = CloudinaryPublic(
-    dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? 'your_cloud_name',
-    dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? 'your_upload_preset',
+    EnvConfig.cloudinaryCloudName.isNotEmpty ? EnvConfig.cloudinaryCloudName : 'dfbzi8cmh',
+    EnvConfig.cloudinaryUploadPreset.isNotEmpty ? EnvConfig.cloudinaryUploadPreset : 'agent_unsigned',
   );
 
   String? get _uid => _auth.currentUser?.uid;
