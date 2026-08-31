@@ -9,14 +9,14 @@
  */
 
 const GOOGLE_PUBLIC_KEYS_URL =
-  'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
+  'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 
 // Cache public keys in memory for the duration of the Worker instance (auto-refreshed)
 let cachedKeys = null;
 let cacheExpiry = 0;
 
 /**
- * Fetch and cache Google's public keys used to sign Firebase JWTs.
+ * Fetch and cache Google's public JWK keys used to sign Firebase JWTs.
  */
 async function getGooglePublicKeys() {
   const now = Date.now();
@@ -29,59 +29,23 @@ async function getGooglePublicKeys() {
     throw new Error('Failed to fetch Google public keys');
   }
 
-  // Parse Cache-Control max-age to know when to refresh
   const cacheControl = response.headers.get('cache-control') || '';
   const maxAgeMatch = cacheControl.match(/max-age=(\d+)/);
-  const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1]) * 1000 : 3600000; // default 1h
+  const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1]) * 1000 : 3600000;
   cacheExpiry = now + maxAge;
 
   const keysJson = await response.json();
-  cachedKeys = keysJson;
-  return keysJson;
-}
-
-/**
- * Convert PEM certificate string to a CryptoKey for RS256 verification.
- */
-async function pemToCryptoKey(pem) {
-  // Strip PEM headers and decode base64
-  const pemBody = pem
-    .replace(/-----BEGIN CERTIFICATE-----/, '')
-    .replace(/-----END CERTIFICATE-----/, '')
-    .replace(/\s/g, '');
-
-  const binaryDer = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
-
-  // Import as a certificate (spki format) for verification
-  return await crypto.subtle.importKey(
-    'raw',
-    binaryDer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['verify']
-  );
-}
-
-/**
- * Import the X.509 certificate's public key directly.
- * Cloudflare supports importing X.509 certs natively.
- */
-async function importPublicKeyFromCert(pem) {
-  const pemBody = pem
-    .replace(/-----BEGIN CERTIFICATE-----/, '')
-    .replace(/-----END CERTIFICATE-----/, '')
-    .replace(/\s/g, '');
-
-  const certDer = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
-
-  // Use SubtleCrypto to import the X.509 certificate public key
-  return await crypto.subtle.importKey(
-    'spki',
-    certDer.buffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['verify']
-  );
+  
+  // Convert JWK array to an object map keyed by kid for easy lookup
+  const jwkMap = {};
+  if (keysJson && keysJson.keys) {
+    for (const key of keysJson.keys) {
+      jwkMap[key.kid] = key;
+    }
+  }
+  
+  cachedKeys = jwkMap;
+  return jwkMap;
 }
 
 /**
@@ -171,31 +135,18 @@ export async function verifyFirebaseToken(token, projectId = 'agent-app-67bc4') 
     throw new Error(`Unknown key ID: ${header.kid}`);
   }
 
-  // 8. Import the certificate's public key
+  // 8. Import the public key from the JWK
   let cryptoKey;
   try {
-    // Try to extract the public key from the X.509 cert
-    // We use a simpler approach: verify using the PEM cert directly
-    // by treating it as DER-encoded SubjectPublicKeyInfo
-    const pemBody = cert
-      .replace(/-----BEGIN CERTIFICATE-----/, '')
-      .replace(/-----END CERTIFICATE-----/, '')
-      .replace(/\s/g, '');
-
-    const certBytes = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
-
-    // Import as X.509 certificate — Cloudflare Workers supports this
     cryptoKey = await crypto.subtle.importKey(
-      'spki',
-      certBytes.buffer,
+      'jwk',
+      cert,
       { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
       false,
       ['verify']
     );
-  } catch {
-    // Fallback: use the firebase-auth-cloudflare-workers library approach
-    // if direct cert import fails (depends on Cloudflare runtime version)
-    throw new Error('Failed to import public key from certificate');
+  } catch (err) {
+    throw new Error('Failed to import public key from JWK: ' + err.message);
   }
 
   // 9. Verify the RS256 signature
@@ -281,11 +232,36 @@ function base64urlFromBytes(bytes) {
 }
 
 async function importPrivateKey(pem) {
+  // If the secret was pasted as the full JSON object, extract the private_key field
+  try {
+    const jsonKey = JSON.parse(pem);
+    if (jsonKey.private_key) {
+      pem = jsonKey.private_key;
+    }
+  } catch (e) {
+    // Not a JSON object, assume it's the raw private key string
+  }
+
+  // Strip literal quotes if any
+  if (pem.startsWith('"') && pem.endsWith('"')) {
+    pem = pem.slice(1, -1);
+  }
+
+  // Replace literal '\n' with actual newlines
+  pem = pem.replace(/\\n/g, '\n');
+
   const pemBody = pem
     .replace(/-----BEGIN PRIVATE KEY-----/, '')
     .replace(/-----END PRIVATE KEY-----/, '')
     .replace(/\s/g, '');
-  const binaryDer = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
+
+  let binaryDer;
+  try {
+    binaryDer = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
+  } catch (err) {
+    throw new Error('atob() called with invalid base64-encoded data. Check if GCP_SERVICE_ACCOUNT_KEY is correctly formatted.');
+  }
+
   return await crypto.subtle.importKey(
     'pkcs8',
     binaryDer,
@@ -307,9 +283,18 @@ export async function getGcpAccessToken(env) {
     );
   }
 
+  // If the user pasted the entire JSON into the EMAIL field by accident, or we need to extract it:
+  let serviceAccountEmail = env.GCP_SERVICE_ACCOUNT_EMAIL;
+  try {
+    const jsonKey = JSON.parse(env.GCP_SERVICE_ACCOUNT_KEY);
+    if (jsonKey.client_email) {
+      serviceAccountEmail = jsonKey.client_email;
+    }
+  } catch (e) {}
+
   const header = { alg: 'RS256', typ: 'JWT' };
   const claims = {
-    iss: env.GCP_SERVICE_ACCOUNT_EMAIL,
+    iss: serviceAccountEmail,
     scope: SCOPE,
     aud: TOKEN_URL,
     exp: now + 3600,
@@ -320,9 +305,7 @@ export async function getGcpAccessToken(env) {
   const encodedClaims = base64urlFromString(JSON.stringify(claims));
   const signingInput = `${encodedHeader}.${encodedClaims}`;
 
-  // Replace escaped newlines if they were stored that way in Cloudflare secrets
-  const rawKey = env.GCP_SERVICE_ACCOUNT_KEY.replace(/\\n/g, '\n');
-  const key = await importPrivateKey(rawKey);
+  const key = await importPrivateKey(env.GCP_SERVICE_ACCOUNT_KEY);
   const signatureBuf = await crypto.subtle.sign(
     { name: 'RSASSA-PKCS1-v1_5' },
     key,

@@ -50,8 +50,8 @@ async function getFirestoreDoc(projectId, collection, docId, idToken) {
  */
 async function updateFirestoreDoc(projectId, collection, docId, fields, idToken) {
   // Build field mask and body
-  const fieldPaths = Object.keys(fields).join(',');
-  const url = `${FIRESTORE_BASE}/projects/${projectId}/databases/(default)/documents/${collection}/${docId}?updateMask.fieldPaths=${fieldPaths}`;
+  const fieldPaths = Object.keys(fields).map(f => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
+  const url = `${FIRESTORE_BASE}/projects/${projectId}/databases/(default)/documents/${collection}/${docId}?${fieldPaths}`;
 
   // Convert JS values to Firestore REST API format
   const firestoreFields = {};
