@@ -149,8 +149,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthenticated = user != null;
       final isProtected = _protectedPaths.any((p) => path.startsWith(p));
 
-      // Not authenticated → redirect from protected pages to /login
-      if (!isAuthenticated && isProtected) return '/login';
+      // Not authenticated → redirect from protected pages to /auth
+      if (!isAuthenticated && isProtected) return '/auth';
 
       // Admin-only paths — client-side gate as defense-in-depth. The real
       // protection is Firestore rules (isAdmin() checks on the underlying
