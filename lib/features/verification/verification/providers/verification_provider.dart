@@ -22,9 +22,9 @@ class VerificationState {
     this.documentData,
   });
 
-  factory VerificationState.initial() => const VerificationState(
+  factory VerificationState.initial([bool isVerified = false]) => VerificationState(
     loading: false,
-    status: VerificationStatus.none,
+    status: isVerified ? VerificationStatus.approved : VerificationStatus.none,
     rejectionReason: null,
     documentData: null,
   );
@@ -60,7 +60,11 @@ class VerificationController {
     if (doc == null) {
       ref.read(_verificationStateProvider.notifier).state = ref
           .read(_verificationStateProvider)
-          .copyWith(status: VerificationStatus.none, rejectionReason: null, documentData: null);
+          .copyWith(
+            status: (user.isVerified == true) ? VerificationStatus.approved : VerificationStatus.none,
+            rejectionReason: null,
+            documentData: null,
+          );
       return;
     }
 
@@ -112,7 +116,6 @@ class VerificationController {
         rejectionReason: null,
       );
 
-
       ref.read(_verificationStateProvider.notifier).state = ref
           .read(_verificationStateProvider)
           .copyWith(loading: false, status: VerificationStatus.pending);
@@ -128,7 +131,6 @@ class VerificationController {
     required VerificationStatus newStatus,
     required String reason,
   }) async {
-    // Admin bypass rules should be enforced in backend / security rules.
     await repository.reviewVerification(
       uid: uid,
       newStatus: newStatus,
@@ -138,7 +140,10 @@ class VerificationController {
 }
 
 final _verificationStateProvider = StateProvider<VerificationState>(
-  (ref) => VerificationState.initial(),
+  (ref) {
+    final currentUser = ref.watch(currentUserProvider);
+    return VerificationState.initial(currentUser?.isVerified == true);
+  },
 );
 
 final verificationRepositoryProvider = Provider<VerificationRepository>((ref) {
@@ -153,5 +158,14 @@ final verificationControllerProvider = Provider<VerificationController>((ref) {
 });
 
 final verificationStateProvider = Provider<VerificationState>((ref) {
-  return ref.watch(_verificationStateProvider);
+  final user = ref.watch(currentUserProvider);
+  final manualState = ref.watch(_verificationStateProvider);
+
+  // If the user profile is already verified, fail open to approved to prevent UI flicker
+  if (user?.isVerified == true && manualState.status == VerificationStatus.none) {
+    return manualState.copyWith(status: VerificationStatus.approved);
+  }
+
+  return manualState;
 });
+

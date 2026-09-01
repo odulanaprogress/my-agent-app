@@ -8,6 +8,7 @@ import '../../providers/verification_provider.dart';
 import '../../domain/verification_type.dart';
 import '../../domain/verification_status.dart';
 import '../../../../../core/services/cloudinary_service.dart';
+import '../../../../../core/widgets/signed_cloudinary_image.dart';
 import '../../../../auth/presentation/providers/current_user_provider.dart';
 import '../../../../../core/services/user_behavior_service.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
@@ -223,10 +224,16 @@ class _UploadVerificationScreenState
     try {
       final cloudinary = CloudinaryService();
 
+      // NOTE: these now store a Cloudinary `public_id`, not a public URL —
+      // the documents upload with `type: authenticated`, so there is no
+      // URL that works by itself. Whatever renders these later (e.g. the
+      // admin verification review screen) needs to request a short-lived
+      // signed delivery URL from GET /api/uploads/cloudinary-signed-url
+      // before displaying the image — see backend/controllers/uploadController.js.
       String frontUrl = _remoteFrontUrl ?? '';
       if (_idFrontFile != null) {
         setState(() => _uploadProgressMessage = 'Uploading ID Front...');
-        final res = await cloudinary.uploadImage(_idFrontFile!);
+        final res = await cloudinary.uploadVerificationDocument(_idFrontFile!);
         if (res == null) throw Exception('Failed to upload ID Front image');
         frontUrl = res;
       }
@@ -234,7 +241,7 @@ class _UploadVerificationScreenState
       String backUrl = _remoteBackUrl ?? '';
       if (_idBackFile != null) {
         setState(() => _uploadProgressMessage = 'Uploading ID Back...');
-        final res = await cloudinary.uploadImage(_idBackFile!);
+        final res = await cloudinary.uploadVerificationDocument(_idBackFile!);
         if (res == null) throw Exception('Failed to upload ID Back image');
         backUrl = res;
       }
@@ -242,7 +249,7 @@ class _UploadVerificationScreenState
       String selfieUrl = _remoteSelfieUrl ?? '';
       if (_selfieFile != null) {
         setState(() => _uploadProgressMessage = 'Uploading Selfie...');
-        final res = await cloudinary.uploadImage(_selfieFile!);
+        final res = await cloudinary.uploadVerificationDocument(_selfieFile!);
         if (res == null) throw Exception('Failed to upload Selfie');
         selfieUrl = res;
       }
@@ -253,14 +260,14 @@ class _UploadVerificationScreenState
       if (isLandlord) {
         if (_propertyOwnershipFile != null) {
           setState(() => _uploadProgressMessage = 'Uploading Ownership Document...');
-          final resOwner = await cloudinary.uploadImage(_propertyOwnershipFile!);
+          final resOwner = await cloudinary.uploadVerificationDocument(_propertyOwnershipFile!);
           if (resOwner == null) throw Exception('Failed to upload Ownership Document');
           ownershipUrl = resOwner;
         }
 
         if (_utilityBillFile != null) {
           setState(() => _uploadProgressMessage = 'Uploading Utility Bill...');
-          final resUtil = await cloudinary.uploadImage(_utilityBillFile!);
+          final resUtil = await cloudinary.uploadVerificationDocument(_utilityBillFile!);
           if (resUtil == null) throw Exception('Failed to upload Utility Bill');
           utilityUrl = resUtil;
         }
@@ -903,20 +910,25 @@ class _UploadVerificationScreenState
                               image: FileImage(file),
                               fit: BoxFit.cover,
                             )
-                          : (imageUrl != null && imageUrl.isNotEmpty)
-                              ? DecorationImage(
-                                  image: NetworkImage(imageUrl),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
+                          : null,
                     ),
-                    child: !hasImage
-                        ? Icon(
-                            isSelfie ? Icons.face_rounded : Icons.photo_library_outlined,
-                            color: const Color(0xFF64748B),
-                            size: 28,
-                          )
-                        : null,
+                    child: file != null
+                        ? null
+                        : (imageUrl != null && imageUrl.isNotEmpty)
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: SignedCloudinaryImage(
+                                  publicId: imageUrl,
+                                  width: 72,
+                                  height: 72,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Icon(
+                                isSelfie ? Icons.face_rounded : Icons.photo_library_outlined,
+                                color: const Color(0xFF64748B),
+                                size: 28,
+                              ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(

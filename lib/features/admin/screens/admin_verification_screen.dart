@@ -6,6 +6,7 @@ import '../../verification/verification/domain/verification_status.dart';
 import '../../verification/verification/domain/verification_type.dart';
 import '../../verification/verification/providers/verification_provider.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
+import 'package:agent_app/core/widgets/signed_cloudinary_image.dart';
 
 
 class AdminVerificationScreen extends ConsumerWidget {
@@ -43,8 +44,8 @@ class AdminVerificationScreen extends ConsumerWidget {
               maxScale: 4.0,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  imageUrl,
+                child: SignedCloudinaryImage(
+                  publicId: imageUrl,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) => Container(
                     padding: const EdgeInsets.all(40),
@@ -461,8 +462,8 @@ class AdminVerificationScreen extends ConsumerWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                imageUrl,
+              child: SignedCloudinaryImage(
+                publicId: imageUrl,
                 width: 100,
                 height: 100,
                 fit: BoxFit.cover,
