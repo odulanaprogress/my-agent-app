@@ -74,6 +74,42 @@ const verifyPayment = async (req, res, next) => {
 };
 
 /**
+ * Verify payment status by transactionId or txRef (for client polling)
+ */
+const verifyPaymentByRef = async (req, res, next) => {
+  try {
+    const { transactionId, txRef } = req.body;
+    
+    // Attempt to verify transaction if flw tx id is somehow provided or via other means.
+    // However, usually we don't have flwTxId here. Let's just check the database status 
+    // since the webhook will update it to 'held' when successful.
+    if (!transactionId) {
+      return res.status(400).json({ success: false, error: 'transactionId is required' });
+    }
+
+    const txDoc = await db.collection('transactions').doc(transactionId).get();
+    if (!txDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Transaction not found' });
+    }
+
+    const txData = txDoc.data();
+    if (txData.status === 'held' || txData.status === 'successful' || txData.status === 'released') {
+      return res.status(200).json({
+        verified: true,
+        status: 'successful'
+      });
+    }
+
+    return res.status(200).json({
+      verified: false,
+      status: txData.status
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Generate Dedicated Flutterwave Merchant Virtual Account
  */
 const generateVirtualAccount = async (req, res, next) => {
@@ -202,6 +238,7 @@ const requestWithdrawal = async (req, res, next) => {
 module.exports = {
   initializePayment,
   verifyPayment,
+  verifyPaymentByRef,
   generateVirtualAccount,
   requestWithdrawal,
 };

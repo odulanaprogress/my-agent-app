@@ -43,7 +43,7 @@ class EscrowApiService {
     String? email,
     String? fullName,
   }) async {
-    final res = await ApiClient.workerPost('/payments/virtual-account', {
+    final res = await ApiClient.post('/payments/flutterwave/virtual-account', {
       'transactionId': transactionId,
       'amount': amount,
       'email': email,
@@ -68,7 +68,7 @@ class EscrowApiService {
     required String transactionId,
     required String txRef,
   }) async {
-    final res = await ApiClient.workerPost('/payments/verify', {
+    final res = await ApiClient.post('/payments/verify-by-ref', {
       'transactionId': transactionId,
       'txRef': txRef,
     });
@@ -119,7 +119,7 @@ class EscrowApiService {
     required String accountNumber,
     required String bankCode,
   }) async {
-    final res = await ApiClient.workerPost('/bank/resolve', {
+    final res = await ApiClient.post('/bank/resolve', {
       'accountNumber': accountNumber.trim(),
       'bankCode': bankCode.trim(),
     });
