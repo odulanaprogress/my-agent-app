@@ -90,7 +90,7 @@ class _BankSetupNotifier extends StateNotifier<_BankSetupState> {
   Future<void> _resolve(String accountNumber, String bankCode) async {
     state = state.copyWith(isResolving: true, clearResolved: true, clearError: true);
     try {
-      final result = await ApiClient.post('/bank/resolve', {
+      final result = await ApiClient.workerPost('/bank/resolve', {
         'accountNumber': accountNumber,
         'bankCode': bankCode,
       });
