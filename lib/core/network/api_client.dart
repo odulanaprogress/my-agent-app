@@ -7,8 +7,11 @@ class ApiClient {
   /// Express backend URL (always points to deployed Vercel backend)
   static const String baseUrl = 'https://my-agent-app-backend.vercel.app/api';
 
-  /// Cloudflare Workers secure API — handles all Flutterwave calls
+  /// Cloudflare Workers secure API — handles AI and other calls
   static const String workersUrl = 'https://agent-api.odulanaprogress.workers.dev';
+
+  /// Railway backend — static IP whitelisted on Flutterwave, handles all withdrawals
+  static const String railwayUrl = 'https://my-agent-app-production-36d3.up.railway.app/api';
 
   static Future<Map<String, String>> _getHeaders() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -54,11 +57,28 @@ class ApiClient {
   }
 
   /// Call the Cloudflare Workers secure API.
-  /// Use this for all Flutterwave-related operations.
+  /// Use this for AI and non-Flutterwave operations.
   static Future<dynamic> workerPost(String path, Map<String, dynamic> body) async {
     try {
       final headers = await _getHeaders();
       final uri = Uri.parse('$workersUrl$path');
+      final response = await http.post(
+        uri,
+        headers: headers,
+        body: jsonEncode(body),
+      );
+      return _processResponse(response);
+    } catch (e) {
+      throw Exception('Workers API Request Failed: $e');
+    }
+  }
+
+  /// Call the Railway backend (static IP whitelisted on Flutterwave).
+  /// Use this for all withdrawal/payout operations.
+  static Future<dynamic> railwayPost(String path, Map<String, dynamic> body) async {
+    try {
+      final headers = await _getHeaders();
+      final uri = Uri.parse('$railwayUrl$path');
       final response = await http.post(
         uri,
         headers: headers,

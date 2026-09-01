@@ -146,7 +146,7 @@ class EscrowApiService {
     required String bankCode,
     required String accountNumber,
   }) async {
-    final res = await ApiClient.workerPost('/payments/withdraw', {
+    final res = await ApiClient.railwayPost('/payments/withdraw', {
       'amount': amount,
       'bankCode': bankCode,
       'accountNumber': accountNumber,
