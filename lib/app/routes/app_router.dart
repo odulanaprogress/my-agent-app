@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,19 +90,45 @@ const _protectedPaths = {
 };
 
 // ── Auth-backed Listenable so GoRouter reacts to login/logout ────────────────
+// Also tracks the current user's `role` from Firestore, so the (synchronous)
+// GoRouter redirect callback below can gate /admin/* paths without needing to
+// make its own async call. Defaults to `false` (not admin) whenever the role
+// is unknown/loading/absent — fail-closed, not fail-open.
 
 class _AuthChangeNotifier extends ChangeNotifier {
-  late final StreamSubscription<User?> _sub;
+  late final StreamSubscription<User?> _authSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roleSub;
+
+  bool isAdmin = false;
 
   _AuthChangeNotifier() {
-    _sub = FirebaseAuth.instance.authStateChanges().listen((_) {
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      _roleSub?.cancel();
+      isAdmin = false;
+
+      if (user != null) {
+        _roleSub = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .snapshots()
+            .listen((snap) {
+          final role = snap.data()?['role'] as String?;
+          final newIsAdmin = role == 'admin';
+          if (newIsAdmin != isAdmin) {
+            isAdmin = newIsAdmin;
+            notifyListeners();
+          }
+        });
+      }
+
       notifyListeners();
     });
   }
 
   @override
   void dispose() {
-    _sub.cancel();
+    _authSub.cancel();
+    _roleSub?.cancel();
     super.dispose();
   }
 }
@@ -124,6 +151,16 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Not authenticated → redirect from protected pages to /login
       if (!isAuthenticated && isProtected) return '/login';
+
+      // Admin-only paths — client-side gate as defense-in-depth. The real
+      // protection is Firestore rules (isAdmin() checks on the underlying
+      // collections), but this stops a non-admin from even landing on the
+      // admin UI in the first place rather than just seeing empty/denied
+      // data once there.
+      final isAdminPath = path == '/admin' || path.startsWith('/admin/');
+      if (isAdminPath && (!isAuthenticated || !authNotifier.isAdmin)) {
+        return '/auth';
+      }
 
       // Email Verification Check (TEMPORARILY DISABLED)
       // All users are treated as verified for now

@@ -24,21 +24,39 @@ service cloud.firestore {
     // ──────────────────────────────────────────
     match /users/{uid} {
       // Signed-in users can read basic profile fields (name, role, avatar) for marketplace/chat.
-      // Sensitive fields (bank details, KYC data) are NOT stored in /users — they live in
-      // /verifications/{uid} which is restricted to owner + admin only.
+      // Sensitive fields (bank details, KYC data) must NEVER be written here — this collection
+      // is broadly readable by any signed-in user with no field-level restriction. Bank details
+      // live in /bank_accounts/{uid} (owner + admin only); KYC data lives in /verifications/{uid}
+      // (owner + admin only, see below).
       allow read: if signedIn();
 
       // Owner can create their own profile — but cannot give themselves admin role.
       allow create: if isOwner(uid) &&
-        (!('role' in request.resource.data) || request.resource.data.role != 'admin');
+        (!('role' in request.resource.data) || request.resource.data.role != 'admin') &&
+        !('bankDetails' in request.resource.data);
 
-      // Owner can update their own profile BUT cannot change the `role` field.
-      // Only an existing admin can change role.
+      // Owner can update their own profile BUT cannot change the `role` field,
+      // and cannot smuggle bank details back onto this document.
       allow update: if isAdmin() ||
-        (isOwner(uid) && request.resource.data.role == resource.data.role);
+        (isOwner(uid) &&
+         request.resource.data.role == resource.data.role &&
+         !('bankDetails' in request.resource.data.diff(resource.data).affectedKeys()));
 
       allow delete: if isOwner(uid) || isAdmin();
     }
+
+    // ──────────────────────────────────────────
+    // Bank accounts — payout destination details. Owner can read/write their
+    // own; nobody else (except admin) can read anyone's bank details. This
+    // used to live on /users/{uid}, which is readable by any signed-in user —
+    // that exposed every user's bank account number/name to every other user.
+    // ──────────────────────────────────────────
+    match /bank_accounts/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid) || isAdmin();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
 
     // ──────────────────────────────────────────
     // Properties

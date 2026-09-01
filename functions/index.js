@@ -431,11 +431,14 @@ exports.verifyEscrowPin = functions.https.onCall(async (data, context) => {
   if (bothVerified && txData && !txData.landlordPaidOut) {
     try {
       const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
-      const landlordDoc = await admin.firestore().collection("users").doc(txData.landlordId).get();
-      const landlordData = landlordDoc.data() || {};
+      // Bank details live in /bank_accounts/{uid} (owner + admin only),
+      // not /users/{uid} (readable by any signed-in user) — see
+      // firestore.rules and scripts/migrate_bank_details.js.
+      const bankAccountDoc = await admin.firestore().collection("bank_accounts").doc(txData.landlordId).get();
+      const bankAccountData = bankAccountDoc.data() || {};
 
-      const bankCode = landlordData.bankCode || txData.landlordBankCode;
-      const accountNumber = landlordData.accountNumber || txData.landlordAccountNumber;
+      const bankCode = bankAccountData.bankCode || txData.landlordBankCode;
+      const accountNumber = bankAccountData.accountNumber || txData.landlordAccountNumber;
       const netPayoutAmount = txData.netPayoutAmount || Math.round((txData.amount || 0) * 0.95);
 
       // Idempotency key — prevents duplicate transfer if function retries

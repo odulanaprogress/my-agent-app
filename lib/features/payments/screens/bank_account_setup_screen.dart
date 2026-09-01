@@ -122,14 +122,17 @@ class _BankSetupNotifier extends StateNotifier<_BankSetupState> {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw Exception('Not logged in');
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'bankDetails': {
-          'accountNumber': state.accountNumber,
-          'bankCode': state.selectedBank!['code'],
-          'bankName': state.selectedBank!['name'],
-          'accountName': state.resolvedAccountName,
-          'verifiedAt': FieldValue.serverTimestamp(),
-        },
+      // Bank details live in their own collection, restricted to the owner +
+      // admin only (see firestore.rules) — NOT on /users/{uid}, which any
+      // signed-in user can read. Field names here match what the payout
+      // logic (functions/index.js verifyEscrowPin) reads: top-level
+      // bankCode/accountNumber, not nested under a bankDetails map.
+      await FirebaseFirestore.instance.collection('bank_accounts').doc(uid).set({
+        'accountNumber': state.accountNumber,
+        'bankCode': state.selectedBank!['code'],
+        'bankName': state.selectedBank!['name'],
+        'accountName': state.resolvedAccountName,
+        'verifiedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       state = state.copyWith(isSaving: false);
       return true;
