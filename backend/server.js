@@ -84,6 +84,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ── Outbound IP check (used to get static IP for Flutterwave whitelisting) ───
+app.get('/api/outbound-ip', async (req, res) => {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    res.status(200).json({ outboundIp: data.ip, message: 'This is the IP to whitelist on Flutterwave' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch outbound IP', detail: err.message });
+  }
+});
+
+
 // ── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api/bank', bankRoutes);
 app.use('/api/escrow/verify-pin', pinRateLimiter); // tight limit on PIN endpoint
