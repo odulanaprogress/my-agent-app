@@ -175,7 +175,7 @@ class _AppLoaderState extends State<AppLoader> with TickerProviderStateMixin {
 
   Widget _logo(double size) {
     return Image.asset(
-      'assets/images/agent_logo.png',
+      'assets/logos/agent_logo.png',
       width: size,
       height: size,
       fit: BoxFit.contain,

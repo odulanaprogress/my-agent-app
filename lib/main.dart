@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'app/app.dart';
@@ -17,7 +17,7 @@ const _kOneSignalAppId = String.fromEnvironment(
   'ONESIGNAL_APP_ID',
   defaultValue: '6b319216-e8b1-4cc4-826a-ec7c482ff9c4',
 );
-const _kReCaptchaKey = String.fromEnvironment('RECAPTCHA_SITE_KEY', defaultValue: '');
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,17 +40,7 @@ Future<void> main() async {
     await FirebaseAuth.instance.setPersistence(Persistence.NONE);
   }
 
-  // Initialize Firebase App Check for Bot Protection
-  try {
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.playIntegrity,
-      appleProvider: AppleProvider.appAttest,
-      webProvider: ReCaptchaEnterpriseProvider(_kReCaptchaKey),
-    );
-  } catch (e) {
-    // App Check failure must never block the app from running.
-    debugPrint('Firebase App Check skipped: $e');
-  }
+
 
   runApp(ProviderScope(child: const AgentApp()));
 }
