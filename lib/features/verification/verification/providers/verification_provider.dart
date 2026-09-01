@@ -139,11 +139,12 @@ class VerificationController {
   }
 }
 
+// Internal mutable state — starts unverified; the controller and the
+// public [verificationStateProvider] below will update it as needed.
+// NOTE: Do NOT use ref.watch() inside a StateProvider — it resets the
+// state on every dependency rebuild and loses manual updates.
 final _verificationStateProvider = StateProvider<VerificationState>(
-  (ref) {
-    final currentUser = ref.watch(currentUserProvider);
-    return VerificationState.initial(currentUser?.isVerified == true);
-  },
+  (ref) => VerificationState.initial(),
 );
 
 final verificationRepositoryProvider = Provider<VerificationRepository>((ref) {
