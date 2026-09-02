@@ -39,11 +39,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (user == null) {
         _ref.read(currentUserProvider.notifier).state = null;
         state = state.copyWith(status: AuthStatus.unauthenticated);
-        if (!kIsWeb) OneSignal.logout();
+        try { OneSignal.logout(); } catch (_) {}
         return;
       }
 
-      if (!kIsWeb) OneSignal.login(user.uid);
+      // Link this device to the user's Firebase UID so OneSignal can target them
+      try { OneSignal.login(user.uid); } catch (_) {}
 
       try {
         final cacheService = UserCacheService();
@@ -139,22 +140,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
         
         UserBehaviorService.logLogin(method: 'email_or_google');
 
-        // OneSignal & push notifications — mobile only
-        if (!kIsWeb) {
-          try {
-            OneSignal.login(user.uid);
-            final granted = await OneSignal.Notifications.requestPermission(true);
-            if (granted) {
-              await Future.delayed(const Duration(seconds: 4));
-              await OneSignalApiService.sendNotification(
-                receiverUids: [user.uid],
-                heading: 'Welcome Back!',
-                content: 'You have successfully logged in to AGENT.',
-              );
-            }
-          } catch (e) {
-            debugPrint('Push notification error: $e');
+        // OneSignal & push notifications — all platforms
+        try {
+          OneSignal.login(user.uid);
+          final granted = await OneSignal.Notifications.requestPermission(true);
+          if (granted) {
+            await Future.delayed(const Duration(seconds: 4));
+            await OneSignalApiService.sendNotification(
+              receiverUids: [user.uid],
+              heading: 'Welcome Back!',
+              content: 'You have successfully logged in to AGENT.',
+            );
           }
+        } catch (e) {
+          debugPrint('Push notification error: $e');
         }
       } catch (e) {
         state = state.copyWith(

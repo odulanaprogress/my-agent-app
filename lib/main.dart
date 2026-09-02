@@ -22,10 +22,13 @@ const _kOneSignalAppId = String.fromEnvironment(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize OneSignal (Mobile platforms only)
-  if (!kIsWeb && _kOneSignalAppId.isNotEmpty) {
+  // Initialize OneSignal — works on both mobile AND web
+  if (_kOneSignalAppId.isNotEmpty) {
     try {
-      OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+      if (!kIsWeb) {
+        // Verbose logging on mobile only (too noisy for web console)
+        OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+      }
       OneSignal.initialize(_kOneSignalAppId);
       OneSignal.Notifications.requestPermission(true);
     } catch (e) {
