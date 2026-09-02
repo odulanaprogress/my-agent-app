@@ -6,10 +6,11 @@
 
 class EnvConfig {
   // =====================
-  // PAYSTACK (public key only — safe for client)
+  // FLUTTERWAVE (public key only — safe for client)
+  // Note: The old Paystack integration has been fully replaced by Flutterwave.
   // =====================
-  static const String paystackPublicKey =
-      String.fromEnvironment('PAYSTACK_PUBLIC_KEY', defaultValue: '');
+  static const String flutterwavePublicKey =
+      String.fromEnvironment('FLUTTERWAVE_PUBLIC_KEY', defaultValue: '');
 
   // =====================
   // CLOUDINARY (cloud name + unsigned upload preset — safe for client)
@@ -19,12 +20,6 @@ class EnvConfig {
 
   static const String cloudinaryUploadPreset =
       String.fromEnvironment('CLOUDINARY_UPLOAD_PRESET', defaultValue: 'agent_unsigned');
-
-  // =====================
-  // FLUTTERWAVE (PUBLIC key only — safe for client)
-  // =====================
-  static const String flutterwavePublicKey =
-      String.fromEnvironment('FLUTTERWAVE_PUBLIC_KEY', defaultValue: '');
 
   // NOTE: FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_ENCRYPTION_KEY,
   // ONESIGNAL_REST_API_KEY, and CLOUDINARY_API_SECRET are intentionally

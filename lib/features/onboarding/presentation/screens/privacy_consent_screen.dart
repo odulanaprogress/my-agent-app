@@ -174,7 +174,7 @@ class _PrivacyConsentScreenState
                         '🔵 Financial Data\n'
                         '• Wallet balance and transaction history\n'
                         '• Escrow transaction records\n'
-                        '• Payment method type (card, bank, USSD — stored by Paystack, not us)\n'
+                        '• Payment method type (card, bank, USSD — processed by Flutterwave, not stored by us)\n'
                         '• Bank Verification Number (BVN) — required for KYC compliance\n\n'
                         '🔵 Property Data\n'
                         '• Property listings you create, including photos, videos, and descriptions\n'
@@ -215,7 +215,7 @@ class _PrivacyConsentScreenState
                     body:
                         'We share your data only when necessary, and only with trusted parties:\n\n'
                         '• Firebase (Google) — Authentication, Firestore database, and cloud storage. Data centres may be located outside Nigeria. Google complies with GDPR Standard Contractual Clauses (SCCs).\n\n'
-                        '• Paystack — Payment processing. Only your email and amount are shared; full card or bank details never pass through our servers.\n\n'
+                        '• Flutterwave — Payment processing. Only your email and amount are shared; full card or bank details never pass through our servers.\n\n'
                         '• Google Maps / Places API — Property location display. No personally identifiable data is shared.\n\n'
                         '• Regulatory Authorities — We may share data with NITDA, EFCC, or law enforcement if legally required.\n\n'
                         'All third-party partners are contractually bound to protect your data and use it only for the specified purpose.',

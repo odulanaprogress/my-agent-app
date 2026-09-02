@@ -100,7 +100,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _PaystackDepositSheet(),
+      builder: (_) => _FlutterwaveDepositSheet(),
     );
     if (result != null && result > 0) {
       setState(() => _isProcessingDeposit = true);
@@ -109,7 +109,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('₦$result successfully deposited via Paystack!'),
+              content: Text('₦$result successfully deposited via Flutterwave!'),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -819,13 +819,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 }
 
-// ── Paystack Deposit Sheet ────────────────────────────────────────────────────
-class _PaystackDepositSheet extends StatefulWidget {
+// ── Flutterwave Deposit Sheet ─────────────────────────────────────────────────
+class _FlutterwaveDepositSheet extends StatefulWidget {
   @override
-  State<_PaystackDepositSheet> createState() => _PaystackDepositSheetState();
+  State<_FlutterwaveDepositSheet> createState() => _FlutterwaveDepositSheetState();
 }
 
-class _PaystackDepositSheetState extends State<_PaystackDepositSheet> {
+class _FlutterwaveDepositSheetState extends State<_FlutterwaveDepositSheet> {
   final _controller = TextEditingController(text: '10000');
   String? _selectedMethod;
   bool _isProcessing = false;
@@ -848,7 +848,7 @@ class _PaystackDepositSheetState extends State<_PaystackDepositSheet> {
       return;
     }
     setState(() => _isProcessing = true);
-    await Future.delayed(const Duration(seconds: 2)); // Simulate Paystack
+    await Future.delayed(const Duration(seconds: 2)); // Simulate Flutterwave
     if (mounted) Navigator.pop(context, amount);
   }
 
@@ -878,18 +878,18 @@ class _PaystackDepositSheetState extends State<_PaystackDepositSheet> {
               margin: const EdgeInsets.symmetric(horizontal: 24),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF09A5DB).withValues(alpha: 0.08),
+                color: const Color(0xFFF5A623).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF09A5DB).withValues(alpha: 0.25)),
+                border: Border.all(color: const Color(0xFFF5A623).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.verified_user_rounded, color: Color(0xFF09A5DB), size: 18),
+                  const Icon(Icons.verified_user_rounded, color: Color(0xFFF5A623), size: 18),
                   const SizedBox(width: 10),
                   const Text(
-                    'Paystack Secure Deposit',
+                    'Flutterwave Secure Deposit',
                     style: TextStyle(
-                      color: Color(0xFF09A5DB),
+                      color: Color(0xFFF5A623),
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -925,7 +925,7 @@ class _PaystackDepositSheetState extends State<_PaystackDepositSheet> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF09A5DB), width: 2),
+                        borderSide: const BorderSide(color: Color(0xFFF5A623), width: 2),
                       ),
                     ),
                   ),
@@ -972,10 +972,10 @@ class _PaystackDepositSheetState extends State<_PaystackDepositSheet> {
                     child: ElevatedButton(
                       onPressed: _isProcessing ? null : _processDeposit,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF09A5DB),
+                        backgroundColor: const Color(0xFFF5A623),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        disabledBackgroundColor: const Color(0xFF09A5DB).withValues(alpha: 0.5),
+                        disabledBackgroundColor: const Color(0xFFF5A623).withValues(alpha: 0.5),
                       ),
                       child: _isProcessing
                           ? const Row(
@@ -983,7 +983,7 @@ class _PaystackDepositSheetState extends State<_PaystackDepositSheet> {
                               children: [
                                 SizedBox(width: 18, height: 18, child: AppLoader(size: 24)),
                                 SizedBox(width: 10),
-                                Text('Processing via Paystack...'),
+                                Text('Processing via Flutterwave...'),
                               ],
                             )
                           : const Text('Deposit Funds', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),

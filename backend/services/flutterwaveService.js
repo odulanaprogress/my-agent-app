@@ -102,7 +102,7 @@ const initializeStandardPayment = async ({ amount, currency = 'NGN', txRef, redi
       tx_ref: txRef,
       amount: amount,
       currency: currency,
-      redirect_url: redirectUrl || 'https://standard.paystack.co/close',
+      redirect_url: redirectUrl || 'https://my-agent-app-teal.vercel.app',
       customer: customer || { email: 'tenant@agentapp.com', name: 'Tenant User' },
       customizations: {
         title: title || 'Flutterwave Escrow Vault Payment',

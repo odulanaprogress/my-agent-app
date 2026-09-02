@@ -27,7 +27,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
     'contact': 'You can reach AGENT support at agentcustomercare@gmail.com or use the Support button on your dashboard.',
     'phone': 'AGENT Real Estate Platform support email: agentcustomercare@gmail.com.',
     'address': 'AGENT operates across Nigeria. Use our platform to explore properties in your preferred state.',
-    'payment': 'All payments on AGENT are processed through Paystack and held in Escrow until you take possession of the property.',
+    'payment': 'All payments on AGENT are processed through Flutterwave and held in Escrow until you take possession of the property.',
     'escrow': 'Our Escrow system ensures the landlord only receives payment once you take possession. This protects both tenant and landlord.',
     'refund': 'Refund requests are handled through our support team. Please open a support ticket for assistance.',
     'verify': 'To get verified, go to your Profile and upload your NIN, government ID or utility bill.',

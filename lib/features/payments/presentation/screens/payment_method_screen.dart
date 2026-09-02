@@ -16,9 +16,9 @@ class PaymentMethodScreen extends ConsumerStatefulWidget {
 class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
   String? _selectedPayment;
   bool _isProcessing = false;
-  String _paystackStep = '';
+  String _flutterwaveStep = '';
 
-  Future<void> _simulatePaystackCheckout() async {
+  Future<void> _initiateFlutterwaveCheckout() async {
     if (_selectedPayment == null) return;
 
     final allowed = await KycGate.require(context, ref);
@@ -26,44 +26,44 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
 
     UserBehaviorService.log(
       action: 'payment_initiated',
-      description: 'Initiated Paystack payment via $_selectedPayment',
+      description: 'Initiated Flutterwave payment via $_selectedPayment',
       metadata: {'payment_channel': _selectedPayment},
     );
 
     setState(() {
       _isProcessing = true;
-      _paystackStep = 'Initializing Secure Paystack Session...';
+      _flutterwaveStep = 'Initializing Secure Flutterwave Session...';
     });
 
     Future.delayed(const Duration(seconds: 1), () {
       if (!mounted) return;
       setState(() {
-        _paystackStep = 'Connecting to Paystack Gateway...';
+        _flutterwaveStep = 'Connecting to Flutterwave Gateway...';
       });
 
       Future.delayed(const Duration(seconds: 1), () {
         if (!mounted) return;
         setState(() {
-          _paystackStep = _selectedPayment == 'card'
+          _flutterwaveStep = _selectedPayment == 'card'
               ? 'Verifying Card details securely...'
               : _selectedPayment == 'bank'
-                  ? 'Awaiting Paystack Bank Transfer confirmation...'
+                  ? 'Awaiting Flutterwave Bank Transfer confirmation...'
                   : _selectedPayment == 'ussd'
                       ? 'Dialing USSD Gateway connection...'
-                      : 'Generating Paystack QR code...';
+                      : 'Generating Flutterwave QR code...';
         });
 
         Future.delayed(const Duration(seconds: 1), () {
           if (!mounted) return;
           setState(() {
-            _paystackStep = 'Authorizing transaction with bank...';
+            _flutterwaveStep = 'Authorizing transaction with bank...';
           });
 
           Future.delayed(const Duration(seconds: 1), () {
             if (!mounted) return;
             UserBehaviorService.log(
               action: 'payment_success',
-              description: 'Completed Paystack payment via $_selectedPayment',
+              description: 'Completed Flutterwave payment via $_selectedPayment',
               metadata: {'payment_channel': _selectedPayment},
             );
             setState(() {
@@ -93,7 +93,7 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
           ],
         ),
         content: const Text(
-          'Your transaction has been processed successfully via Paystack. Funds are securely locked in the AGENT Escrow vault.',
+          'Your transaction has been processed successfully via Flutterwave. Funds are securely locked in the AGENT Escrow vault.',
           textAlign: TextAlign.center,
           style: TextStyle(height: 1.5, fontSize: 14, color: Colors.black87),
         ),
@@ -149,33 +149,33 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Paystack header badge
+                // Flutterwave header badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF09A5DB).withValues(alpha: 0.08),
+                    color: const Color(0xFFF5A623).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF09A5DB).withValues(alpha: 0.2)),
+                    border: Border.all(color: const Color(0xFFF5A623).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.verified_user_rounded, color: Color(0xFF09A5DB)),
+                      const Icon(Icons.verified_user_rounded, color: Color(0xFFF5A623)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Paystack Secure Gateway',
+                              'Flutterwave Secure Gateway',
                               style: TextStyle(
-                                color: Color(0xFF09A5DB),
+                                color: Color(0xFFF5A623),
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'All payments are processed securely via Paystack API.',
+                              'All payments are processed securely via Flutterwave API.',
                               style: TextStyle(
                                 color: Colors.grey.shade600,
                                 fontSize: 11,
@@ -190,7 +190,7 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
                 const SizedBox(height: 24),
 
                 const Text(
-                  'Select Paystack Method',
+                  'Select Flutterwave Method',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -240,7 +240,7 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _selectedPayment != null ? _simulatePaystackCheckout : null,
+                    onPressed: _selectedPayment != null ? _initiateFlutterwaveCheckout : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0F172A),
                       foregroundColor: Colors.white,
@@ -264,7 +264,7 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
             ),
           ),
 
-          // Paystack Processing Dialog
+          // Flutterwave Processing Dialog
           if (_isProcessing)
             Container(
               color: Colors.black.withValues(alpha: 0.6),
@@ -281,9 +281,9 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
                       AppLoader(size: 24),
                       const SizedBox(height: 24),
                       const Text(
-                        'SECURE PAYSTACK CHECKOUT',
+                        'SECURE FLUTTERWAVE CHECKOUT',
                         style: TextStyle(
-                          color: Color(0xFF09A5DB),
+                          color: Color(0xFFF5A623),
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.2,
                           fontSize: 12,
@@ -291,7 +291,7 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _paystackStep,
+                        _flutterwaveStep,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
