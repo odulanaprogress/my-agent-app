@@ -245,7 +245,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Ignored to ensure logout proceeds even if offline
     }
     await UserCacheService().clearCache();
-    if (!kIsWeb) OneSignal.logout();
+    try { OneSignal.logout(); } catch (_) {}
     await _authService.signOut();
   }
 
