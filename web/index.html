@@ -97,11 +97,8 @@
       }
     }, 200);
 
-    // Safety timeout
-    setTimeout(function() {
-      clearInterval(checkInterval);
-      removeSplash();
-    }, 8000);
+    // The splash screen will stay visible until 'flutter-first-frame' 
+    // or until the fallback interval detects the flutter view.
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
