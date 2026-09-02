@@ -24,6 +24,10 @@ class EscrowApiService {
     required String landlordId,
     required String propertyId,
     required int amount,
+    String? virtualAccountNumber,
+    String? virtualBankName,
+    String? virtualAccountName,
+    String? txRef,
   }) async {
     return (await ApiClient.post('/payments/initialize', {
       'transactionId': transactionId,
@@ -31,6 +35,10 @@ class EscrowApiService {
       'landlordId': landlordId,
       'propertyId': propertyId,
       'amount': amount,
+      if (virtualAccountNumber != null) 'virtualAccountNumber': virtualAccountNumber,
+      if (virtualBankName != null) 'virtualBankName': virtualBankName,
+      if (virtualAccountName != null) 'virtualAccountName': virtualAccountName,
+      if (txRef != null) 'txRef': txRef,
     })) as Map<String, dynamic>;
   }
 

@@ -6,15 +6,30 @@ const flutterwaveService = require('../services/flutterwaveService');
  */
 const initializePayment = async (req, res, next) => {
   try {
-    const { transactionId, tenantId, landlordId, propertyId, amount } = req.body;
+    const { 
+      transactionId, 
+      tenantId, 
+      landlordId, 
+      propertyId, 
+      amount,
+      virtualAccountNumber,
+      virtualBankName,
+      virtualAccountName,
+      txRef: clientTxRef
+    } = req.body;
+
     if (!tenantId || !landlordId || !propertyId || !amount) {
       return res.status(400).json({ success: false, error: 'Missing tenantId, landlordId, propertyId, or amount' });
     }
 
-    const txRef = transactionId || `AGENT-ESCROW-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const txRef = clientTxRef || transactionId || `AGENT-ESCROW-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     const tenantPin = Math.floor(100000 + Math.random() * 900000).toString();
     const landlordPin = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const commissionPercent = 20.0;
+    const commissionAmount = Math.round(amount * (commissionPercent / 100));
+    const netPayoutAmount = amount - commissionAmount;
 
     const batch = db.batch();
     const txDoc = db.collection('transactions').doc(txRef);
@@ -25,6 +40,9 @@ const initializePayment = async (req, res, next) => {
       landlordId: landlordId,
       propertyId: propertyId,
       amount: parseInt(amount, 10),
+      commissionPercent,
+      commissionAmount,
+      netPayoutAmount,
       status: 'pending',
       type: 'escrow',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -32,6 +50,9 @@ const initializePayment = async (req, res, next) => {
       landlordPaidOut: false,
       tenantPinVerified: false,
       landlordPinVerified: false,
+      ...(virtualAccountNumber && { virtualAccountNumber }),
+      ...(virtualBankName && { virtualBankName }),
+      ...(virtualAccountName && { virtualAccountName }),
     });
 
     const tenantPinDoc = txDoc.collection('pins').doc(tenantId);

@@ -45,24 +45,13 @@ class PaymentRepository {
       landlordId: landlordId,
       propertyId: propertyId,
       amount: amount,
+      virtualAccountNumber: virtualAccountNumber,
+      virtualBankName: virtualBankName,
+      virtualAccountName: virtualAccountName,
+      txRef: txRef,
     );
     
     final txRefId = response['txRef'] as String? ?? transactionId;
-
-    final commissionPercent = 20.0;
-    final commissionAmount = (amount * (commissionPercent / 100)).round();
-    final netPayoutAmount = amount - commissionAmount;
-
-    await _txCollection.doc(txRefId).update({
-      'commissionPercent': commissionPercent,
-      'commissionAmount': commissionAmount,
-      'netPayoutAmount': netPayoutAmount,
-      'virtualAccountNumber': virtualAccountNumber,
-      'virtualBankName': virtualBankName ?? 'Wema Bank (Flutterwave)',
-      'virtualAccountName': virtualAccountName ?? 'FLUTTERWAVE / AGENT ESCROW',
-      'txRef': txRef ?? 'FLW-ESC-${txRefId.substring(0, 8).toUpperCase()}',
-      'paidAt': status == EscrowStatus.held ? Timestamp.now() : null,
-    });
 
     return txRefId;
   }
