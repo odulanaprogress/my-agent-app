@@ -88,13 +88,16 @@ const handleWebhook = async (req, res, next) => {
       // Safe log — correlation IDs only, NO secret values
       console.log(`✅ Escrow established txRef=${txRef} flwTxId=${flwTxId}`);
 
+      // Fetch tenant email from Firestore for receipt reference
+      const tenantEmail = payload.data?.customer?.email || null;
+      const tenantName = payload.data?.customer?.name || 'Tenant';
 
       // Push notifications — NO PINs in the message body
       if (tenantId) {
         await sendPushNotification({
           userId: tenantId,
-          title: '🛡️ Rent Payment Placed in Escrow',
-          message: `Your rent payment of ₦${amountPaid} is secured. Open the app to view your PIN.`,
+          title: '✅ Payment Confirmed — Escrow Active',
+          message: `Your rent payment of ₦${amountPaid.toLocaleString()} has been received and secured in Escrow. Check your email (${tenantEmail || 'inbox'}) for your Flutterwave receipt.`,
           data: { type: 'escrow', transactionId: txRef },
         });
       }
@@ -103,10 +106,34 @@ const handleWebhook = async (req, res, next) => {
         await sendPushNotification({
           userId: landlordId,
           title: '🎉 Rent Received in Escrow Vault',
-          message: `Rent of ₦${amountPaid} is in Escrow. Open the app to view your PIN.`,
+          message: `₦${amountPaid.toLocaleString()} has been secured in Escrow. You will be paid out after key handover is confirmed.`,
           data: { type: 'escrow', transactionId: txRef },
         });
-      }    }
+      }
+    }
+
+    // ── Handle successful withdrawal transfer ─────────────────────────────────
+    if (payload.event === 'transfer.completed' && payload.data) {
+      const transferRef = payload.data.reference;
+      const transferStatus = payload.data.status;
+      const transferAmount = payload.data.amount;
+
+      console.log(`💸 Transfer webhook: ref=${transferRef} status=${transferStatus} amount=${transferAmount}`);
+
+      // Extract uid from reference format: WITHDRAW-{uid8}-{timestamp}
+      if (transferRef && transferRef.startsWith('WITHDRAW-')) {
+        const parts = transferRef.split('-');
+        // parts[1] is the uid prefix
+        console.log(`✅ Withdrawal of ₦${transferAmount} completed for uid_prefix=${parts[1]}, status=${transferStatus}`);
+
+        // If transfer FAILED, we need to refund the balance
+        if (transferStatus === 'FAILED') {
+          console.error(`❌ Transfer FAILED for ref=${transferRef}. Manual review needed.`);
+          // TODO: Implement automatic refund by looking up the withdrawal record
+          // For now, log for manual intervention
+        }
+      }
+    }
 
     return res.status(200).json({ success: true, message: 'Webhook Event Processed' });
   } catch (error) {
