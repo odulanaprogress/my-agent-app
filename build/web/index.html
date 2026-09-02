@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Agent App Real Estate & Property Platform">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Agent App">
+  <meta name="theme-color" content="#0F172A">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Agent App</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body {
+      background-color: #0F172A;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    #loading-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #0F172A;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 99999;
+      transition: opacity 0.4s ease-out;
+    }
+    .splash-logo {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      animation: pulse 1.8s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.85; }
+      50% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.85; }
+    }
+    .spinner {
+      margin-top: 24px;
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      border-top-color: #38BDF8;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-splash">
+    <img src="agent_logo.png" alt="Agent App Logo" class="splash-logo">
+    <div class="spinner"></div>
+  </div>
+  <script>
+    function removeSplash() {
+      var splash = document.getElementById('loading-splash');
+      if (splash && splash.parentNode) {
+        splash.style.opacity = '0';
+        setTimeout(function() {
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+          }
+        }, 400);
+      }
+    }
+
+    // Listen for Flutter first frame event
+    window.addEventListener('flutter-first-frame', removeSplash);
+
+    // Fallback check if flutter element is mounted in DOM
+    var checkInterval = setInterval(function() {
+      if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || document.querySelector('canvas')) {
+        removeSplash();
+        clearInterval(checkInterval);
+      }
+    }, 200);
+
+    // Safety timeout
+    setTimeout(function() {
+      clearInterval(checkInterval);
+      removeSplash();
+    }, 8000);
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

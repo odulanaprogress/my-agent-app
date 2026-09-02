@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "buildCommand": "flutter build web --release --no-tree-shake-icons",
   "outputDirectory": "build/web",
   "cleanUrls": true,
   "rewrites": [
