@@ -17,7 +17,10 @@ const verifyTransaction = async (flwTxId) => {
 };
 
 /**
- * Execute automated bank transfer payout to Landlord
+ * Execute automated bank transfer payout
+ * NOTE: Flutterwave's /transfers API returns status:"success" when the transfer
+ * is QUEUED, but the actual transfer data.status can be "NEW", "PENDING", or "FAILED".
+ * We check both levels so failed transfers are caught immediately.
  */
 const executePayout = async ({ bankCode, accountNumber, amount, narration, reference }) => {
   try {
@@ -25,20 +28,37 @@ const executePayout = async ({ bankCode, accountNumber, amount, narration, refer
       account_bank: bankCode,
       account_number: accountNumber,
       amount: amount,
-      narration: narration || 'Agent Escrow Landlord Payout',
+      narration: narration || 'Agent Wallet Withdrawal',
       currency: 'NGN',
       reference: reference || `PAYOUT-${Date.now()}`,
     });
 
+    // Level 1: API call accepted
     if (response.data && response.data.status === 'success') {
-      return response.data.data;
+      const transferData = response.data.data;
+
+      // Level 2: Actual transfer status
+      if (transferData && transferData.status === 'FAILED') {
+        const reason = transferData.complete_message || transferData.narration || 'Transfer was rejected by Flutterwave.';
+        console.error(`❌ Transfer FAILED immediately: ref=${transferData.reference}, reason=${reason}`);
+        throw new Error(`Transfer failed: ${reason}`);
+      }
+
+      // NEW / PENDING = queued successfully, webhook will confirm completion
+      console.log(`💸 Transfer queued: ref=${transferData?.reference}, status=${transferData?.status}, amount=₦${amount}`);
+      return transferData;
     }
-    throw new Error(response.data.message || 'Payout transfer failed.');
+
+    throw new Error(response.data?.message || 'Payout transfer failed.');
   } catch (error) {
+    // Re-throw cleanly if already our custom Error
+    if (error.message && error.message.startsWith('Transfer failed:')) throw error;
     console.error('❌ Flutterwave Payout error:', error.response ? error.response.data : error.message);
-    throw new Error(error.response?.data?.message || 'Flutterwave Payout Execution Failed.');
+    const msg = error.response?.data?.message || error.message || 'Flutterwave Payout Execution Failed.';
+    throw new Error(msg);
   }
 };
+
 
 /**
  * Resolve NUBAN bank account number to account holder name
