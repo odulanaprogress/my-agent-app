@@ -380,7 +380,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                           ? null
                           : () async {
                               final acct = accountController.text.trim();
-                              final amt = int.tryParse(amountController.text.trim()) ?? 0;
+                              final rawAmtStr = amountController.text.trim().replaceAll(RegExp(r'[^0-9.]'), '');
+                              final amt = double.tryParse(rawAmtStr)?.toInt() ?? 0;
                               if (acct.length != 10) {
                                 setModalState(() => transferError = 'Please enter a valid 10-digit NUBAN account number.');
                                 return;
