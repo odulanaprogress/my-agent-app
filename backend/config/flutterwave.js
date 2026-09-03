@@ -1,24 +1,30 @@
 const axios = require('axios');
-const { HttpsProxyAgent } = require('https-proxy-agent');
 
 const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
-const proxyUrl = process.env.PROXY_URL || process.env.FIXIE_URL;
+const bridgeUrl = process.env.PHP_BRIDGE_URL;
+const bridgeToken = process.env.PHP_BRIDGE_TOKEN;
 
-const axiosConfig = {
-  baseURL: 'https://api.flutterwave.com/v3',
-  headers: {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${secretKey}`,
-  },
+const flwClient = axios.create({
   timeout: 15000,
-};
+});
 
-// Route traffic through Static IP Proxy if the URL is provided
-if (proxyUrl) {
-  axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
-  console.log('🛡️ Flutterwave API traffic is routed through Static IP Proxy');
-}
-
-const flwClient = axios.create(axiosConfig);
+// Interceptor to hijack the request and send it to the PHP bridge if configured
+flwClient.interceptors.request.use((config) => {
+  const targetUrl = `https://api.flutterwave.com/v3${config.url}`;
+  
+  if (bridgeUrl && bridgeToken) {
+    config.baseURL = '';
+    config.url = bridgeUrl;
+    config.headers['x-bridge-token'] = bridgeToken;
+    config.headers['x-target-url'] = targetUrl;
+    config.headers['x-flw-authorization'] = `Bearer ${secretKey}`;
+    config.headers['Content-Type'] = 'application/json';
+  } else {
+    config.baseURL = 'https://api.flutterwave.com/v3';
+    config.headers['Authorization'] = `Bearer ${secretKey}`;
+    config.headers['Content-Type'] = 'application/json';
+  }
+  return config;
+});
 
 module.exports = flwClient;
