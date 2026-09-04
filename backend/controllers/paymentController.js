@@ -182,9 +182,11 @@ const generateVirtualAccount = async (req, res, next) => {
 const requestWithdrawal = async (req, res, next) => {
   try {
     const uid = req.user.uid; // from verified Firebase token only
-    const { amount, bankCode, accountNumber } = req.body;
+    const { amount: rawAmount, bankCode, accountNumber } = req.body;
 
-    if (!amount || typeof amount !== 'number' || amount <= 0) {
+    // Coerce to number — Dart/JSON may send integers as strings in some encodings
+    const amount = Number(rawAmount);
+    if (!rawAmount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid withdrawal amount.' });
     }
     if (!bankCode || !accountNumber) {
@@ -222,7 +224,7 @@ const requestWithdrawal = async (req, res, next) => {
       payoutRes = await flutterwaveService.executePayout({
         bankCode: bankCode.trim(),
         accountNumber: accountNumber.trim(),
-        amount,
+        amount: Math.round(amount), // Flutterwave requires whole NGN amount
         narration: 'Agent Wallet Withdrawal',
         reference: `WITHDRAW-${uid.slice(0, 8)}-${Date.now()}`,
       });
