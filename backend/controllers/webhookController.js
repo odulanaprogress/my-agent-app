@@ -33,7 +33,7 @@ const handleWebhook = async (req, res, next) => {
       const txData = snap.exists ? snap.data() : {};
 
       // 1.5 Handle Wallet Deposit
-      if (txRef.startsWith('DEP-') || txData.type === 'deposit') {
+      if (txRef.includes('DEP') || txData.type === 'deposit') {
         const userId = txData.userId || txData.tenantId;
         if (userId) {
           const walletRef = db.collection('wallets').doc(userId);
@@ -111,7 +111,6 @@ const handleWebhook = async (req, res, next) => {
 
       // Store PINs in private subcollections — Firestore rules allow only the
       // owner to read their own PIN. No PIN ever appears on the main document.
-      const txData = snap.exists ? snap.data() : {};
       const tenantId = txData.tenantId;
       const landlordId = txData.landlordId;
 
