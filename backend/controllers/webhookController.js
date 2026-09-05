@@ -28,6 +28,48 @@ const handleWebhook = async (req, res, next) => {
         return res.status(400).json({ success: false, error: 'Payment verification failed.' });
       }
 
+      const txDocRef = db.collection('transactions').doc(txRef);
+      const snap = await txDocRef.get();
+      const txData = snap.exists ? snap.data() : {};
+
+      // 1.5 Handle Wallet Deposit
+      if (txRef.startsWith('DEP-') || txData.type === 'deposit') {
+        const userId = txData.userId || txData.tenantId;
+        if (userId) {
+          const walletRef = db.collection('wallets').doc(userId);
+          await db.runTransaction(async (t) => {
+            const wDoc = await t.get(walletRef);
+            const currentBal = wDoc.exists ? (wDoc.data().availableBalance || wDoc.data().balance || 0) : 0;
+            t.set(walletRef, {
+              uid: userId,
+              availableBalance: currentBal + amountPaid,
+              balance: currentBal + amountPaid,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+
+            t.set(txDocRef, {
+              id: txRef,
+              status: 'completed',
+              type: 'deposit',
+              userId: userId,
+              flutterwaveTxId: flwTxId,
+              amount: amountPaid,
+              currency: currency,
+              paidAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+          });
+
+          await sendPushNotification({
+            userId: userId,
+            title: '💰 Wallet Deposit Confirmed',
+            message: `₦${amountPaid.toLocaleString()} has been credited to your Agent wallet via Flutterwave.`,
+            data: { type: 'wallet', transactionId: txRef },
+          });
+        }
+        return res.status(200).json({ success: true, message: 'Wallet deposit processed' });
+      }
+
       // 2. Financial Breakdown (5% Platform Fee, 95% Landlord Payout)
       const commissionPercent = 5;
       const commissionAmount = Math.round(amountPaid * (commissionPercent / 100));
@@ -36,9 +78,6 @@ const handleWebhook = async (req, res, next) => {
       // 3. Cryptographically Random 6-Digit Handshake PINs
       const tenantPin = generateSixDigitPin();
       const landlordPin = generateSixDigitPin();
-
-      const txDocRef = db.collection('transactions').doc(txRef);
-      const snap = await txDocRef.get();
 
       const updateData = {
         flutterwaveTxId: flwTxId,

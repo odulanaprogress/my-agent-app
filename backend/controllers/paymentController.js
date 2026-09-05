@@ -123,6 +123,37 @@ const verifyPaymentByRef = async (req, res, next) => {
     if (refToQuery) {
       const flwTx = await flutterwaveService.verifyTransactionByRef(refToQuery);
       if (flwTx && flwTx.status === 'successful') {
+        const amountPaid = flwTx.amount || txData.amount;
+
+        if (refToQuery.startsWith('DEP-') || txData.type === 'deposit') {
+          const userId = txData.userId || txData.tenantId;
+          if (userId) {
+            const walletRef = db.collection('wallets').doc(userId);
+            await db.runTransaction(async (t) => {
+              const wDoc = await t.get(walletRef);
+              const currentBal = wDoc.exists ? (wDoc.data().availableBalance || wDoc.data().balance || 0) : 0;
+              t.set(walletRef, {
+                uid: userId,
+                availableBalance: currentBal + amountPaid,
+                balance: currentBal + amountPaid,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }, { merge: true });
+
+              t.set(txDoc.ref, {
+                status: 'completed',
+                flutterwaveTxId: flwTx.id,
+                amount: amountPaid,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }, { merge: true });
+            });
+          }
+          return res.status(200).json({
+            verified: true,
+            status: 'successful',
+            data: flwTx,
+          });
+        }
+
         await txDoc.ref.update({
           status: 'held',
           flutterwaveTxId: flwTx.id,
