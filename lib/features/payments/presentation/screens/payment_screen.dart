@@ -33,6 +33,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   double get _flutterwaveFee => (_rentAmount + _agencyFee + _platformFee) * 0.014; // 1.4% FW fee
   double get _totalPackage => _rentAmount + _agencyFee + _platformFee + _flutterwaveFee;
 
+  String _formatCurrency(num amount) {
+    return amount.round().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
   Future<void> _processFlutterwavePayment() async {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) {
@@ -601,7 +608,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Rent Amount', style: TextStyle(color: Colors.black54, fontSize: 13)),
-                        Text('₦${_rentAmount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        Text('₦${_formatCurrency(_rentAmount)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -609,7 +616,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Agency & Agent Fee (20%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
-                        Text('₦${_agencyFee.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        Text('₦${_formatCurrency(_agencyFee)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -617,7 +624,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Escrow & Platform Protection (5%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
-                        Text('₦${_platformFee.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        Text('₦${_formatCurrency(_platformFee)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -625,7 +632,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Flutterwave Transfer Fee (1.4%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
-                        Text('₦${_flutterwaveFee.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        Text('₦${_formatCurrency(_flutterwaveFee)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -643,7 +650,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           ),
                         ),
                         Text(
-                          '₦${_totalPackage.toStringAsFixed(0)}',
+                          '₦${_formatCurrency(_totalPackage)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 20,
@@ -753,7 +760,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   label: _isProcessing
                       ? const AppLoader(size: 20)
                       : Text(
-                          'Pay ₦${_totalPackage.toStringAsFixed(0)} via Flutterwave',
+                          'Pay ₦${_formatCurrency(_totalPackage)} via Flutterwave',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,

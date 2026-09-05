@@ -17,6 +17,26 @@ const verifyTransaction = async (flwTxId) => {
 };
 
 /**
+ * Double-check payment status directly with Flutterwave API by transaction reference (tx_ref)
+ */
+const verifyTransactionByRef = async (txRef) => {
+  try {
+    const response = await flwClient.get(`/transactions?tx_ref=${encodeURIComponent(txRef)}`);
+    if (response.data && response.data.status === 'success' && response.data.data) {
+      const items = Array.isArray(response.data.data) ? response.data.data : [response.data.data];
+      const successfulTx = items.find((tx) => tx.status === 'successful');
+      if (successfulTx) {
+        return successfulTx;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Flutterwave verify by txRef error:', error.response ? error.response.data : error.message);
+    return null;
+  }
+};
+
+/**
  * Execute automated bank transfer payout
  * NOTE: Flutterwave's /transfers API returns status:"success" when the transfer
  * is QUEUED, but the actual transfer data.status can be "NEW", "PENDING", or "FAILED".
@@ -143,6 +163,7 @@ const initializeStandardPayment = async ({ amount, currency = 'NGN', txRef, redi
 
 module.exports = {
   verifyTransaction,
+  verifyTransactionByRef,
   executePayout,
   resolveBankAccount,
   createVirtualAccount,

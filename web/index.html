@@ -100,6 +100,15 @@
     // The splash screen will stay visible until 'flutter-first-frame' 
     // or until the fallback interval detects the flutter view.
   </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        for (var i = 0; i < regs.length; i++) {
+          regs[i].update();
+        }
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

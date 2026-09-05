@@ -101,9 +101,6 @@ const verifyPaymentByRef = async (req, res, next) => {
   try {
     const { transactionId, txRef } = req.body;
     
-    // Attempt to verify transaction if flw tx id is somehow provided or via other means.
-    // However, usually we don't have flwTxId here. Let's just check the database status 
-    // since the webhook will update it to 'held' when successful.
     if (!transactionId) {
       return res.status(400).json({ success: false, error: 'transactionId is required' });
     }
@@ -119,6 +116,26 @@ const verifyPaymentByRef = async (req, res, next) => {
         verified: true,
         status: 'successful'
       });
+    }
+
+    // Direct Flutterwave API query fallback
+    const refToQuery = txRef || txData.txRef || transactionId;
+    if (refToQuery) {
+      const flwTx = await flutterwaveService.verifyTransactionByRef(refToQuery);
+      if (flwTx && flwTx.status === 'successful') {
+        await txDoc.ref.update({
+          status: 'held',
+          flutterwaveTxId: flwTx.id,
+          paidAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        return res.status(200).json({
+          verified: true,
+          status: 'successful',
+          data: flwTx,
+        });
+      }
     }
 
     return res.status(200).json({

@@ -694,68 +694,106 @@ class _PropertyDetailsScreenState
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Pricing Package Breakdown',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Base Rent / Price',
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                            ),
-                            Text(
-                              '₦${_formatPrice(p.price)}',
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Agency & Agent Fee (20%)',
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                            ),
-                            Text(
-                              '₦${_formatPrice(p.price * 0.20)}',
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 24, thickness: 1),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Builder(
+                      builder: (context) {
+                        final baseRent = p.price.toDouble();
+                        final agencyFee = baseRent * 0.20;
+                        final platformFee = baseRent * 0.05;
+                        final flutterwaveFee = (baseRent + agencyFee + platformFee) * 0.014;
+                        final totalPackage = baseRent + agencyFee + platformFee + flutterwaveFee;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Total Package',
+                              'Pricing Package Breakdown',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontSize: 15,
                                 color: Color(0xFF0F172A),
                               ),
                             ),
-                            Text(
-                              '₦${_formatPrice(p.price * 1.20)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: Color(0xFF6366F1),
-                              ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Base Rent / Price',
+                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                ),
+                                Text(
+                                  '₦${_formatCurrency(baseRent)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Agency & Agent Fee (20%)',
+                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                ),
+                                Text(
+                                  '₦${_formatCurrency(agencyFee)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Escrow & Platform Protection (5%)',
+                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                ),
+                                Text(
+                                  '₦${_formatCurrency(platformFee)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Flutterwave Transfer Fee (1.4%)',
+                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                ),
+                                Text(
+                                  '₦${_formatCurrency(flutterwaveFee)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 24, thickness: 1),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Total Package',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  '₦${_formatCurrency(totalPackage)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Color(0xFF6366F1),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -955,6 +993,13 @@ class _PropertyDetailsScreenState
           ],
         ),
       ),
+    );
+  }
+
+  String _formatCurrency(num amount) {
+    return amount.round().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
     );
   }
 
