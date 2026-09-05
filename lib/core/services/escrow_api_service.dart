@@ -58,14 +58,16 @@ class EscrowApiService {
       'fullName': fullName,
     });
 
-    if (res['success'] == true && res['paymentLink'] != null) {
+    if (res['success'] == true && res['accountNumber'] != null) {
       return {
-        'paymentLink': res['paymentLink'].toString(),
+        'accountNumber': res['accountNumber'].toString(),
+        'bankName': res['bankName']?.toString() ?? 'Flutterwave MFB',
+        'accountName': res['accountName']?.toString() ?? 'FLUTTERWAVE / AGENT ESCROW',
         'txRef': res['txRef']?.toString() ?? 'FLW-ESC-${transactionId.substring(0, 8).toUpperCase()}',
       };
     }
 
-    throw AppException(res['error']?.toString() ?? 'Unable to initialize secure payment.');
+    throw AppException(res['error']?.toString() ?? 'Unable to generate virtual account.');
   }
 
   /// Verify Flutterwave Payment Transfer Status.

@@ -12,7 +12,6 @@ import '../../domain/escrow_status.dart';
 import '../widgets/payment_receipt_dialog.dart';
 import 'escrow_details_screen.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final PropertyModel property;
@@ -71,9 +70,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             propertyId: widget.property.id,
             amount: _totalPackage.round(),
             status: EscrowStatus.pending,
-            virtualAccountNumber: 'STANDARD_CHECKOUT',
-            virtualBankName: 'Flutterwave',
-            virtualAccountName: currentUser.fullName,
+            virtualAccountNumber: vaInfo['accountNumber'],
+            virtualBankName: vaInfo['bankName'],
+            virtualAccountName: vaInfo['accountName'],
             txRef: vaInfo['txRef'],
           );
 
@@ -81,17 +80,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
       if (!mounted) return;
 
-      final paymentUrl = Uri.parse(vaInfo['paymentLink']!);
-      if (await canLaunchUrl(paymentUrl)) {
-        await launchUrl(paymentUrl, mode: LaunchMode.externalApplication);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open payment link.')),
-        );
-      }
-
-      // Show Payment Verification Sheet
-      _showPaymentVerificationModal(context, txId, vaInfo, currentUser.fullName);
+      // Show Flutterwave Virtual Account Transfer Sheet
+      _showFlutterwaveVirtualAccountModal(context, txId, vaInfo, currentUser.fullName);
     } catch (e) {
       setState(() => _isProcessing = false);
       if (!mounted) return;
@@ -104,7 +94,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
-  void _showPaymentVerificationModal(
+  void _showFlutterwaveVirtualAccountModal(
     BuildContext context,
     String transactionId,
     Map<String, String> vaInfo,
@@ -229,7 +219,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     const SizedBox(height: 16),
 
                     if (!isVerified) ...[
-                      // Verification Instructions Box
+                      // Virtual Account Details Box
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(18),
@@ -239,34 +229,95 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           border: Border.all(color: const Color(0xFF0F172A).withValues(alpha: 0.12), width: 1.5),
                         ),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.open_in_browser_rounded, size: 40, color: Color(0xFF0F172A)),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Complete Payment in Browser',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Bank Partner', style: TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w600)),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    vaInfo['bankName'] ?? 'Wema Bank (Flutterwave)',
+                                    textAlign: TextAlign.end,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'You have been redirected to Flutterwave secure checkout to complete your payment.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 13, color: Colors.black54, height: 1.4),
+                            const SizedBox(height: 10),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Account Name', style: TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w600)),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    vaInfo['accountName'] ?? 'FLUTTERWAVE / AGENT ESCROW',
+                                    textAlign: TextAlign.end,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 20),
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                final paymentUrl = Uri.parse(vaInfo['paymentLink']!);
-                                await launchUrl(paymentUrl, mode: LaunchMode.externalApplication);
-                              },
-                              icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
-                              label: const Text('Re-open Checkout Link', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0F172A),
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
+                            const SizedBox(height: 12),
+                            const Divider(height: 1),
+                            const SizedBox(height: 12),
+
+                            const Text('DEDICATED ACCOUNT NUMBER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.black45, letterSpacing: 0.8)),
+                            const SizedBox(height: 6),
+
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: SelectableText(
+                                    vaInfo['accountNumber'] ?? '8030001234',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1.5,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Clipboard.setData(ClipboardData(text: vaInfo['accountNumber'] ?? ''));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        duration: Duration(seconds: 2),
+                                        content: Text('Account number copied to clipboard!'),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.copy_rounded, size: 14, color: Colors.white),
+                                  label: const Text('Copy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0F172A),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ],
                             ),
+
+                            const SizedBox(height: 12),
+                            const Divider(height: 1),
+                            const SizedBox(height: 10),
+
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Exact Amount to Pay', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                Text('₦$formattedTotal', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF10B981))),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text('Merchant Ref: ${vaInfo['txRef']}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontFamily: 'monospace')),
                           ],
                         ),
                       ),
@@ -286,7 +337,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Once you have completed the payment on the Flutterwave page, click the button below to verify your payment.',
+                              'Transfer exact amount via your mobile banking app. Money goes directly to Flutterwave Escrow Vault.',
                               style: TextStyle(fontSize: 11, color: Colors.black87, height: 1.3),
                             ),
                           ),
@@ -387,8 +438,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                             propertyTitle: widget.property.title,
                             amount: _totalPackage.round(),
                             tenantName: tenantName,
-                            bankName: 'Flutterwave',
-                            accountNumber: 'STANDARD_CHECKOUT',
+                            bankName: vaInfo['bankName'] ?? 'Wema Bank (Flutterwave)',
+                            accountNumber: vaInfo['accountNumber'] ?? '',
                             paidAt: DateTime.now(),
                           );
                         },

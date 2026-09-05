@@ -139,19 +139,27 @@ const generateVirtualAccount = async (req, res, next) => {
     const txRef = `FLW-ESC-${transactionId ? transactionId.substring(0, 8).toUpperCase() : Date.now()}`;
 
     if (process.env.FLUTTERWAVE_SECRET_KEY && process.env.FLUTTERWAVE_SECRET_KEY.startsWith('FLWSECK')) {
-      const paymentData = await flutterwaveService.initializeStandardPayment({
+      const nameParts = (fullName || 'Tenant User').trim().split(' ');
+      const firstname = nameParts[0] || 'Tenant';
+      const lastname = nameParts.slice(1).join(' ') || 'User';
+
+      const vaData = await flutterwaveService.createVirtualAccount({
+        email: email || 'tenant@agentapp.com',
+        isPermanent: false,
         amount: amount,
         txRef: txRef,
-        customer: {
-          email: email || 'tenant@agentapp.com',
-          name: fullName || 'Tenant User',
-        },
+        bvn: bvn,
+        firstname: firstname,
+        lastname: lastname,
       });
 
       return res.status(200).json({
         success: true,
-        paymentLink: paymentData.link,
+        accountNumber: vaData.account_number,
+        bankName: vaData.bank_name || 'Wema Bank (Flutterwave)',
+        accountName: vaData.account_name || 'FLUTTERWAVE / AGENT ESCROW',
         txRef: txRef,
+        flwRef: vaData.flw_ref,
       });
     }
 
