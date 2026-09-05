@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -403,14 +404,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       ),
                       const SizedBox(height: 12),
 
-                      // ── Biometrics ───────────────────────────────
-                      _outlinedBtn(
-                        label: 'Continue with Biometrics',
-                        icon: Icons.fingerprint_rounded,
-                        iconColor: const Color(0xFF6366F1),
-                        onTap: () => context.push('/fingerprint'),
-                      ),
-                      const SizedBox(height: 28),
+                      // ── Biometrics (Mobile Only) ───────────────────
+                      if (!kIsWeb) ...[
+                        _outlinedBtn(
+                          label: 'Continue with Biometrics',
+                          icon: Icons.fingerprint_rounded,
+                          iconColor: const Color(0xFF6366F1),
+                          onTap: () => context.push('/fingerprint'),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      const SizedBox(height: 16),
 
                       // ── Sign up link ─────────────────────────────
                       Row(

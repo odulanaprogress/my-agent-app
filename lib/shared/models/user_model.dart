@@ -53,7 +53,7 @@ class UserModel {
       email: map['email'] ?? '',
       fullName: map['fullName'] ?? '',
       role: map['role'] ?? 'tenant',
-      profileImage: map['profileImage'],
+      profileImage: map['profileImage'] ?? map['profileImageUrl'] ?? map['photoUrl'] ?? map['avatarUrl'],
       favoritesCount: (map['favoritesCount'] is int)
           ? (map['favoritesCount'] as int)
           : int.tryParse('${map['favoritesCount'] ?? 0}') ?? 0,

@@ -66,6 +66,7 @@ const _protectedPaths = {
   '/favorites',
   '/profile',
   '/edit-profile',
+  '/settings',
   '/bank-setup',
   '/conversations',
   '/wallet',

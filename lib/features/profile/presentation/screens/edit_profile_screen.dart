@@ -9,6 +9,9 @@ import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/widgets/custom_button.dart';
 
 import '../providers/profile_provider.dart';
+import '../../../auth/presentation/providers/current_user_provider.dart';
+import '../../../../shared/models/user_model.dart';
+import '../../../../core/storage/user_cache_service.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
 
 
@@ -149,6 +152,27 @@ class _EditProfileScreenStateImpl
                                   fullName: _fullNameController.text.trim(),
                                   profileImageUrl: imageUrl,
                                 );
+
+                            final currentUser = ref.read(currentUserProvider);
+                            if (currentUser != null) {
+                              final updatedUser = UserModel(
+                                uid: currentUser.uid,
+                                email: currentUser.email,
+                                fullName: _fullNameController.text.trim(),
+                                role: currentUser.role,
+                                profileImage: imageUrl ?? currentUser.profileImage,
+                                favoritesCount: currentUser.favoritesCount,
+                                isVerified: currentUser.isVerified,
+                                privacyAccepted: currentUser.privacyAccepted,
+                                onboardingCompleted: currentUser.onboardingCompleted,
+                                createdAt: currentUser.createdAt,
+                              );
+                              ref.read(currentUserProvider.notifier).state = updatedUser;
+                              try {
+                                await UserCacheService().saveUser(updatedUser);
+                              } catch (_) {}
+                            }
+                            ref.invalidate(profileProvider);
 
                             if (!context.mounted) return;
                             Navigator.of(context).pop();

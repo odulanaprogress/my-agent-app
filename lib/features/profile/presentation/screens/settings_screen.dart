@@ -106,7 +106,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () async {
               await ref.read(authNotifierProvider.notifier).logout();
               if (!context.mounted) return;
-              context.go('/login');
+              context.go('/auth');
             },
           ),
           
@@ -149,7 +149,7 @@ class SettingsScreen extends ConsumerWidget {
                   await ref.read(authNotifierProvider.notifier).logout();
                   if (context.mounted) {
                     Navigator.pop(context); // Close loading
-                    context.go('/login');
+                    context.go('/auth');
                   }
                 } catch (e) {
                   if (context.mounted) {

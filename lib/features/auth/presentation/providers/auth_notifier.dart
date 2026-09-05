@@ -247,6 +247,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await UserCacheService().clearCache();
     try { OneSignal.logout(); } catch (_) {}
     await _authService.signOut();
+    _ref.read(currentUserProvider.notifier).state = null;
+    state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
   Future<void> loginWithGoogle() async {

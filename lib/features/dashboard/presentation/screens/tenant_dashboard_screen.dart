@@ -216,11 +216,6 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
-    // Prompt biometric registration if not set up
-    final proceed = await showBiometricRegistrationPromptIfNeeded(context);
-    if (!proceed) return;
-    if (!context.mounted) return;
-
     final bool? shouldLogout = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -250,7 +245,7 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
     if (shouldLogout == true) {
       await ref.read(authNotifierProvider.notifier).logout();
       if (!context.mounted) return;
-      context.go('/login');
+      context.go('/auth');
     }
   }
 

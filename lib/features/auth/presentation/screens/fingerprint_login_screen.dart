@@ -30,13 +30,7 @@ class _FingerprintLoginScreenState extends State<FingerprintLoginScreen> {
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      // Biometric auth not supported on web – redirect away immediately
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.go('/login');
-      });
-      return;
-    }
+    if (kIsWeb) return;
     _isRegistrationMode = FirebaseAuth.instance.currentUser != null;
     _checkBiometrics();
   }
@@ -251,6 +245,81 @@ class _FingerprintLoginScreenState extends State<FingerprintLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                context.go('/auth');
+              }
+            },
+          ),
+        ),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(Icons.fingerprint_rounded, color: Color(0xFF6366F1), size: 56),
+                  ),
+                  const SizedBox(height: 28),
+                  const Text(
+                    'Mobile Feature Only',
+                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Biometric and fingerprint authentication requires native hardware sensors available on the Agent Mobile App (Android & iOS).\n\nOn the web, please sign in securely with your email and password.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 14, height: 1.5),
+                  ),
+                  const SizedBox(height: 36),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        } else {
+                          context.go('/auth');
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366F1),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Return to Login', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A), // Premium dark background
       body: SafeArea(

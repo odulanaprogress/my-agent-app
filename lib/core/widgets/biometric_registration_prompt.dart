@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +14,8 @@ import '../../core/storage/secure_storage_service.dart';
 Future<bool> showBiometricRegistrationPromptIfNeeded(
   BuildContext context,
 ) async {
+  if (kIsWeb) return true; // Biometrics not supported on web browsers
+
   final storage = SecureStorageService();
   final email = await storage.read('biometric_email');
 
