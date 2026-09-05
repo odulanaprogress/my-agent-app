@@ -29,7 +29,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   double get _rentAmount => widget.property.price.toDouble();
   double get _agencyFee => _rentAmount * 0.20; // 20% Agency Fee
-  double get _totalPackage => _rentAmount + _agencyFee;
+  double get _platformFee => _rentAmount * 0.05; // 5% Escrow Protection
+  double get _flutterwaveFee => (_rentAmount + _agencyFee + _platformFee) * 0.014; // 1.4% FW fee
+  double get _totalPackage => _rentAmount + _agencyFee + _platformFee + _flutterwaveFee;
 
   Future<void> _processFlutterwavePayment() async {
     final currentUser = ref.read(currentUserProvider);
@@ -608,6 +610,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       children: [
                         const Text('Agency & Agent Fee (20%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
                         Text('₦${_agencyFee.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Escrow & Platform Protection (5%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                        Text('₦${_platformFee.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Flutterwave Transfer Fee (1.4%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                        Text('₦${_flutterwaveFee.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       ],
                     ),
                     const SizedBox(height: 14),
