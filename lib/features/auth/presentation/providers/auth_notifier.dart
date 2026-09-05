@@ -239,16 +239,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
-    try {
-      await UserBehaviorService.logLogout();
-    } catch (_) {
-      // Ignored to ensure logout proceeds even if offline
-    }
-    await UserCacheService().clearCache();
-    try { OneSignal.logout(); } catch (_) {}
-    await _authService.signOut();
+    // 1. Immediately reset memory state so UI and routers react synchronously
     _ref.read(currentUserProvider.notifier).state = null;
     state = const AuthState(status: AuthStatus.unauthenticated);
+
+    // 2. Clear local cache
+    try {
+      await UserCacheService().clearCache();
+    } catch (_) {}
+
+    // 3. Fire-and-forget logging and push notification logout without blocking
+    UserBehaviorService.logLogout().timeout(const Duration(seconds: 2)).catchError((_) {});
+    if (!kIsWeb) {
+      try { OneSignal.logout(); } catch (_) {}
+    }
+
+    // 4. Sign out Firebase Auth and Google
+    try {
+      await _authService.signOut();
+    } catch (e) {
+      debugPrint('[AuthNotifier] signOut error: $e');
+    }
   }
 
   Future<void> loginWithGoogle() async {

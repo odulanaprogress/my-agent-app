@@ -31,5 +31,6 @@ final authStateChangesProvider = StreamProvider<User?>((ref) {
 });
 
 final currentUidProvider = Provider<String?>((ref) {
-  return ref.watch(authStateChangesProvider).value?.uid;
+  final streamUid = ref.watch(authStateChangesProvider).value?.uid;
+  return streamUid ?? FirebaseAuth.instance.currentUser?.uid;
 });

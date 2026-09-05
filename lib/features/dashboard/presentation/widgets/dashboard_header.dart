@@ -31,13 +31,28 @@ class DashboardHeader extends ConsumerWidget {
             ? user.fullName.trim()
             : (authUser?.displayName?.trim() ?? '');
 
-    final String? avatarUrl = (profileData?['profileImage'] as String?)?.trim().isNotEmpty == true
-        ? (profileData!['profileImage'] as String).trim()
-        : (profileData?['profileImageUrl'] as String?)?.trim().isNotEmpty == true
-            ? (profileData!['profileImageUrl'] as String).trim()
-            : (user?.profileImage != null && user!.profileImage!.trim().isNotEmpty)
-                ? user.profileImage!.trim()
-                : authUser?.photoURL;
+    String? avatarUrl;
+    if (profileData != null) {
+      for (final key in [
+        'profileImage',
+        'profileImageUrl',
+        'photoUrl',
+        'photoURL',
+        'avatarUrl',
+        'avatar',
+        'image',
+        'imageUrl',
+      ]) {
+        final val = profileData[key];
+        if (val is String && val.trim().isNotEmpty) {
+          avatarUrl = val.trim();
+          break;
+        }
+      }
+    }
+    avatarUrl ??= (user?.profileImage != null && user!.profileImage!.trim().isNotEmpty)
+        ? user.profileImage!.trim()
+        : authUser?.photoURL;
 
     final String firstName = fullName.isNotEmpty ? fullName.split(' ').first : '';
 
@@ -103,6 +118,19 @@ class DashboardHeader extends ConsumerWidget {
                           width: 48,
                           height: 48,
                           fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: Text(
+                                _getInitials(fullName),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            );
+                          },
                           errorBuilder: (context, error, stackTrace) => Center(
                             child: Text(
                               _getInitials(fullName),

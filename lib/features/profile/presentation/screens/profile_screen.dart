@@ -139,9 +139,13 @@ class ProfileScreen extends ConsumerWidget {
                     );
 
                     if (shouldLogout == true) {
-                      await ref.read(authNotifierProvider.notifier).logout();
+                      try {
+                        await ref.read(authNotifierProvider.notifier).logout();
+                      } catch (e) {
+                        debugPrint('[ProfileScreen] Logout error: $e');
+                      }
                       if (!context.mounted) return;
-                      context.go('/auth');
+                      context.go('/login');
                     }
                   },
                 ),

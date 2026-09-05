@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -48,6 +49,7 @@ class _LandlordDashboardScreenState
   }
 
   Future<void> _checkJustRegistered() async {
+    if (kIsWeb) return; // Biometrics are mobile-only
     final prefs = await SharedPreferences.getInstance();
     final justRegistered = prefs.getBool('just_registered') ?? false;
     // Also check if this is the first login on this device (fingerprint not yet set)
@@ -138,9 +140,13 @@ class _LandlordDashboardScreenState
     );
 
     if (shouldLogout == true) {
-      await ref.read(authNotifierProvider.notifier).logout();
+      try {
+        await ref.read(authNotifierProvider.notifier).logout();
+      } catch (e) {
+        debugPrint('[LandlordDashboard] Logout error: $e');
+      }
       if (!context.mounted) return;
-      context.go('/auth');
+      context.go('/login');
     }
   }
 

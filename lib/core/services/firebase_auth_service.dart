@@ -144,14 +144,23 @@ class FirebaseAuthService {
   }
 
   Future<void> signOut() async {
-    // Google sign-out may throw if the user signed in with email/password
-    // or if the GoogleSignIn plugin was never initialised. Always guard it
-    // so Firebase sign-out is guaranteed to run.
+    // Google sign-out can hang on web if user didn't sign in via Google.
+    // Always guard it with timeouts and provider checks so Firebase sign-out runs.
     try {
-      await _googleSignIn.signOut();
+      if (!kIsWeb) {
+        await _googleSignIn.signOut().timeout(const Duration(seconds: 2));
+      } else {
+        final isGoogleUser = _firebaseAuth.currentUser?.providerData
+            .any((p) => p.providerId == 'google.com') ?? false;
+        if (isGoogleUser) {
+          await _googleSignIn.signOut().timeout(const Duration(seconds: 2));
+        }
+      }
     } catch (_) {}
 
-    await _firebaseAuth.signOut();
+    try {
+      await _firebaseAuth.signOut().timeout(const Duration(seconds: 3));
+    } catch (_) {}
   }
 
   Future<void> sendPasswordResetEmail(String email) async {

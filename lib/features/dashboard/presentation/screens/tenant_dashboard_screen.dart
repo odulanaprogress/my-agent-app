@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -46,6 +47,7 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
   }
 
   Future<void> _checkJustRegistered() async {
+    if (kIsWeb) return; // Biometrics are mobile-only
     final prefs = await SharedPreferences.getInstance();
     final justRegistered = prefs.getBool('just_registered') ?? false;
     final justLoggedIn = prefs.getBool('just_logged_in') ?? false;
@@ -243,9 +245,13 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
     );
 
     if (shouldLogout == true) {
-      await ref.read(authNotifierProvider.notifier).logout();
+      try {
+        await ref.read(authNotifierProvider.notifier).logout();
+      } catch (e) {
+        debugPrint('[TenantDashboard] Logout error: $e');
+      }
       if (!context.mounted) return;
-      context.go('/auth');
+      context.go('/login');
     }
   }
 

@@ -104,9 +104,13 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.logout,
             title: 'Logout',
             onTap: () async {
-              await ref.read(authNotifierProvider.notifier).logout();
+              try {
+                await ref.read(authNotifierProvider.notifier).logout();
+              } catch (e) {
+                debugPrint('[SettingsScreen] Logout error: $e');
+              }
               if (!context.mounted) return;
-              context.go('/auth');
+              context.go('/login');
             },
           ),
           
