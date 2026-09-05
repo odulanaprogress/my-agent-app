@@ -699,8 +699,7 @@ class _PropertyDetailsScreenState
                         final baseRent = p.price.toDouble();
                         final agencyFee = baseRent * 0.20;
                         final platformFee = baseRent * 0.05;
-                        final flutterwaveFee = (baseRent + agencyFee + platformFee) * 0.014;
-                        final totalPackage = baseRent + agencyFee + platformFee + flutterwaveFee;
+                        final subtotal = baseRent + agencyFee + platformFee;
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -760,12 +759,12 @@ class _PropertyDetailsScreenState
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Flutterwave Transfer Fee (1.4%)',
+                                  'Flutterwave Transfer Fee',
                                   style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                                 ),
-                                Text(
-                                  '₦${_formatCurrency(flutterwaveFee)}',
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                const Text(
+                                  'Calculated by Flutterwave',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF10B981)),
                                 ),
                               ],
                             ),
@@ -774,7 +773,7 @@ class _PropertyDetailsScreenState
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text(
-                                  'Total Package',
+                                  'Subtotal',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
@@ -782,10 +781,10 @@ class _PropertyDetailsScreenState
                                   ),
                                 ),
                                 Text(
-                                  '₦${_formatCurrency(totalPackage)}',
+                                  '₦${_formatCurrency(subtotal)}',
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
                                     color: Color(0xFF6366F1),
                                   ),
                                 ),

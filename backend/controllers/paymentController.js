@@ -125,7 +125,7 @@ const verifyPaymentByRef = async (req, res, next) => {
       if (flwTx && flwTx.status === 'successful') {
         const amountPaid = flwTx.amount || txData.amount;
 
-        if (refToQuery.startsWith('DEP-') || txData.type === 'deposit') {
+        if (refToQuery.includes('DEP') || txData.type === 'deposit') {
           const userId = txData.userId || txData.tenantId;
           if (userId) {
             const walletRef = db.collection('wallets').doc(userId);
@@ -183,31 +183,36 @@ const verifyPaymentByRef = async (req, res, next) => {
  */
 const generateVirtualAccount = async (req, res, next) => {
   try {
-    const { transactionId, amount, email, fullName, bvn } = req.body;
-    const txRef = `FLW-ESC-${transactionId ? transactionId.substring(0, 8).toUpperCase() : Date.now()}`;
+    const { transactionId, amount, email, fullName, bvn, phoneNumber, phone } = req.body;
+    const cleanTxId = (transactionId || `TX-${Date.now()}`).toString().replace(/[^a-zA-Z0-9-_]/g, '');
+    const txRef = req.body.txRef || (cleanTxId.startsWith('FLW-') ? cleanTxId : `FLW-${cleanTxId}`);
 
     if (process.env.FLUTTERWAVE_SECRET_KEY && process.env.FLUTTERWAVE_SECRET_KEY.startsWith('FLWSECK')) {
-      const nameParts = (fullName || 'Tenant User').trim().split(' ');
-      const firstname = nameParts[0] || 'Tenant';
+      const nameParts = (fullName || 'Agent User').trim().split(' ');
+      const firstname = nameParts[0] || 'Agent';
       const lastname = nameParts.slice(1).join(' ') || 'User';
 
       const vaData = await flutterwaveService.createVirtualAccount({
-        email: email || 'tenant@agentapp.com',
+        email: email || 'user@agentapp.com',
         isPermanent: false,
         amount: amount,
         txRef: txRef,
         bvn: bvn,
         firstname: firstname,
         lastname: lastname,
+        phonenumber: phoneNumber || phone || '08012345678',
       });
 
       return res.status(200).json({
         success: true,
         accountNumber: vaData.account_number,
-        bankName: vaData.bank_name || 'Wema Bank (Flutterwave)',
+        bankName: vaData.bank_name || 'Flutterwave MFB',
         accountName: vaData.account_name || 'FLUTTERWAVE / AGENT ESCROW',
         txRef: txRef,
         flwRef: vaData.flw_ref,
+        amount: vaData.amount ? parseFloat(vaData.amount) : amount,
+        note: vaData.note,
+        expiryDate: vaData.expiry_date,
       });
     }
 
@@ -306,10 +311,31 @@ const requestWithdrawal = async (req, res, next) => {
   }
 };
 
+/**
+ * Calculate dynamic Flutterwave fee
+ */
+const getFlutterwaveFee = async (req, res, next) => {
+  try {
+    const amount = Number(req.query.amount) || 0;
+    if (amount <= 0) {
+      return res.status(400).json({ success: false, error: 'Valid amount is required' });
+    }
+
+    const feeData = await flutterwaveService.calculateFee(amount);
+    return res.status(200).json({
+      success: true,
+      data: feeData,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   initializePayment,
   verifyPayment,
   verifyPaymentByRef,
   generateVirtualAccount,
   requestWithdrawal,
+  getFlutterwaveFee,
 };

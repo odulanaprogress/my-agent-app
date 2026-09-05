@@ -971,6 +971,7 @@ class _FlutterwaveDepositSheetState extends ConsumerState<_FlutterwaveDepositShe
       } catch (_) {}
     }
     if (mounted) {
+      ref.invalidate(_walletDataProvider);
       setState(() {
         _isVerified = true;
         _isVerifying = false;
@@ -1199,13 +1200,19 @@ class _FlutterwaveDepositSheetState extends ConsumerState<_FlutterwaveDepositShe
                           const Divider(height: 1),
                           const SizedBox(height: 10),
 
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Exact Amount to Pay', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
-                              Text('₦${_formatCurrency(_depositAmount)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF10B981))),
-                            ],
-                          ),
+                            Builder(
+                              builder: (context) {
+                                final exactAmount = _vaInfo!['amount'] != null ? double.tryParse(_vaInfo!['amount']!) : null;
+                                final displayAmount = exactAmount != null ? _formatCurrency(exactAmount) : _formatCurrency(_depositAmount);
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Exact Amount to Pay', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                    Text('₦$displayAmount', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF10B981))),
+                                  ],
+                                );
+                              },
+                            ),
                           const SizedBox(height: 4),
                           Text('Ref: ${_vaInfo!['txRef']}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontFamily: 'monospace')),
                         ],

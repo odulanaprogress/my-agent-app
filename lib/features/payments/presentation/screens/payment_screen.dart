@@ -30,8 +30,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   double get _rentAmount => widget.property.price.toDouble();
   double get _agencyFee => _rentAmount * 0.20; // 20% Agency Fee
   double get _platformFee => _rentAmount * 0.05; // 5% Escrow Protection
-  double get _flutterwaveFee => (_rentAmount + _agencyFee + _platformFee) * 0.014; // 1.4% FW fee
-  double get _totalPackage => _rentAmount + _agencyFee + _platformFee + _flutterwaveFee;
+  double get _subtotal => _rentAmount + _agencyFee + _platformFee;
+  double get _totalPackage => _subtotal;
 
   String _formatCurrency(num amount) {
     return amount.round().toString().replaceAllMapped(
@@ -67,17 +67,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       final tempTxId = 'tx_${DateTime.now().millisecondsSinceEpoch}';
       final vaInfo = await escrowApiService.generateFlutterwaveVirtualAccount(
         transactionId: tempTxId,
-        amount: _totalPackage.round(),
+        amount: _subtotal.round(),
         propertyTitle: widget.property.title,
         email: currentUser.email,
         fullName: currentUser.fullName,
       );
 
+      final exactFlwAmount = vaInfo['amount'] != null ? double.tryParse(vaInfo['amount']!) : null;
+      final finalAmount = exactFlwAmount?.round() ?? _subtotal.round();
 
       final txId = await ref.read(paymentControllerProvider).createEscrowPayment(
             landlordId: widget.property.ownerId,
             propertyId: widget.property.id,
-            amount: _totalPackage.round(),
+            amount: finalAmount,
             status: EscrowStatus.pending,
             virtualAccountNumber: vaInfo['accountNumber'],
             virtualBankName: vaInfo['bankName'],
@@ -145,10 +147,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               }
             });
 
-            final formattedTotal = _totalPackage.round().toString().replaceAllMapped(
-                  RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                  (Match m) => '${m[1]},',
-                );
+            final exactFlwAmount = vaInfo['amount'] != null ? double.tryParse(vaInfo['amount']!) : null;
+            final formattedTotal = exactFlwAmount != null
+                ? _formatCurrency(exactFlwAmount)
+                : _formatCurrency(_totalPackage);
 
 
             return SafeArea(
@@ -445,7 +447,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                             transactionId: transactionId,
                             txRef: vaInfo['txRef'] ?? '',
                             propertyTitle: widget.property.title,
-                            amount: _totalPackage.round(),
+                            amount: exactFlwAmount?.round() ?? _subtotal.round(),
                             tenantName: tenantName,
                             bankName: vaInfo['bankName'] ?? 'Wema Bank (Flutterwave)',
                             accountNumber: vaInfo['accountNumber'] ?? '',
@@ -628,11 +630,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Row(
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Flutterwave Transfer Fee (1.4%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
-                        Text('₦${_formatCurrency(_flutterwaveFee)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        Text('Flutterwave Transfer Fee', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                        Text('Calculated by Flutterwave', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF10B981))),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -642,7 +644,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Total Escrow Package',
+                          'Subtotal Package',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
@@ -650,7 +652,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           ),
                         ),
                         Text(
-                          '₦${_formatCurrency(_totalPackage)}',
+                          '₦${_formatCurrency(_subtotal)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 20,

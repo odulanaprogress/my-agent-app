@@ -106,7 +106,7 @@ const resolveBankAccount = async ({ accountNumber, bankCode }) => {
 /**
  * Create dynamic Flutterwave Virtual Account NUBAN for direct bank transfer payments
  */
-const createVirtualAccount = async ({ email, isPermanent = false, amount, txRef, bvn, firstname, lastname }) => {
+const createVirtualAccount = async ({ email, isPermanent = false, amount, txRef, bvn, firstname, lastname, phonenumber }) => {
   try {
     const payload = {
       email: email || 'tenant@agentapp.com',
@@ -115,7 +115,9 @@ const createVirtualAccount = async ({ email, isPermanent = false, amount, txRef,
       tx_ref: txRef,
       firstname: firstname || 'Tenant',
       lastname: lastname || 'User',
-      narration: `Escrow Rent ${txRef}`,
+      phonenumber: phonenumber || '08012345678',
+      currency: 'NGN',
+      narration: `Payment ${txRef}`,
     };
     if (bvn) {
       payload.bvn = bvn;
@@ -130,6 +132,28 @@ const createVirtualAccount = async ({ email, isPermanent = false, amount, txRef,
   } catch (error) {
     console.error('❌ Flutterwave Virtual Account creation error:', error.response ? error.response.data : error.message);
     throw new Error(error.response?.data?.message || 'Flutterwave Virtual Account generation failed.');
+  }
+};
+
+/**
+ * Calculate dynamic Flutterwave transaction fees directly from Flutterwave API
+ */
+const calculateFee = async (amount, currency = 'NGN') => {
+  try {
+    const response = await flwClient.get(`/transactions/fee?amount=${amount}&currency=${currency}`);
+    if (response.data && response.data.status === 'success') {
+      return response.data.data;
+    }
+    return {
+      fee: Math.round(amount * 0.014),
+      charge_amount: Math.round(amount * 1.014),
+    };
+  } catch (error) {
+    console.error('Flutterwave fee calculation error:', error.response ? error.response.data : error.message);
+    return {
+      fee: Math.round(amount * 0.014),
+      charge_amount: Math.round(amount * 1.014),
+    };
   }
 };
 
@@ -167,6 +191,7 @@ module.exports = {
   executePayout,
   resolveBankAccount,
   createVirtualAccount,
+  calculateFee,
   initializeStandardPayment,
 };
 

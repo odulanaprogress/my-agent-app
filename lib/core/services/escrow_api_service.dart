@@ -64,6 +64,7 @@ class EscrowApiService {
         'bankName': res['bankName']?.toString() ?? 'Flutterwave MFB',
         'accountName': res['accountName']?.toString() ?? 'FLUTTERWAVE / AGENT ESCROW',
         'txRef': res['txRef']?.toString() ?? 'FLW-ESC-${transactionId.substring(0, 8).toUpperCase()}',
+        if (res['amount'] != null) 'amount': res['amount'].toString(),
       };
     }
 
