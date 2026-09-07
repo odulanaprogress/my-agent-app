@@ -820,6 +820,7 @@ class _FlutterwaveDepositSheetState extends ConsumerState<_FlutterwaveDepositShe
   bool _isVerifying = false;
   bool _isVerified = false;
   Timer? _pollTimer;
+  StreamSubscription<DocumentSnapshot>? _txSubscription;
 
   Map<String, String>? _vaInfo;
   String? _txId;
@@ -829,6 +830,7 @@ class _FlutterwaveDepositSheetState extends ConsumerState<_FlutterwaveDepositShe
 
   @override
   void dispose() {
+    _txSubscription?.cancel();
     _pollTimer?.cancel();
     _controller.dispose();
     super.dispose();
@@ -896,6 +898,18 @@ class _FlutterwaveDepositSheetState extends ConsumerState<_FlutterwaveDepositShe
         _depositAmount = amount;
       });
 
+      // Real-time snapshot listener: detects when backend/webhook marks transaction as completed
+      _txSubscription?.cancel();
+      _txSubscription = FirebaseFirestore.instance
+          .collection('transactions')
+          .doc(tempTxId)
+          .snapshots()
+          .listen((snap) {
+        if (snap.exists && snap.data()?['status'] == 'completed' && mounted && !_isVerified) {
+          _onDepositSuccessful(amount, currentUser.uid);
+        }
+      });
+
       _startPolling(tempTxId, vaInfo['txRef'] ?? tempTxId, amount, currentUser.uid);
     } catch (e) {
       if (mounted) {
@@ -961,15 +975,9 @@ class _FlutterwaveDepositSheetState extends ConsumerState<_FlutterwaveDepositShe
 
   Future<void> _onDepositSuccessful(int amount, String uid) async {
     _pollTimer?.cancel();
-    if (uid.isNotEmpty) {
-      try {
-        await ref.read(walletRepositoryProvider).incrementBalance(
-          uid: uid,
-          delta: amount,
-          updatedAt: DateTime.now(),
-        );
-      } catch (_) {}
-    }
+    _txSubscription?.cancel();
+    // Server is the single authoritative source of truth for crediting the wallet.
+    // Client only invalidates the provider to re-fetch verified balance from Firestore.
     if (mounted) {
       ref.invalidate(_walletDataProvider);
       setState(() {

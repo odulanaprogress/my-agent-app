@@ -185,6 +185,26 @@ const initializeStandardPayment = async ({ amount, currency = 'NGN', txRef, redi
   }
 };
 
+/**
+ * Retrieve Flutterwave Payout/Wallet Balance
+ */
+const getPayoutBalance = async (currency = 'NGN') => {
+  try {
+    const response = await flwClient.get(`/balances/${currency}`);
+    if (response.data && response.data.status === 'success' && response.data.data) {
+      return {
+        currency: response.data.data.currency || currency,
+        available_balance: Number(response.data.data.available_balance || 0),
+        ledger_balance: Number(response.data.data.ledger_balance || 0),
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Flutterwave get balance error:', error.response ? error.response.data : error.message);
+    return null;
+  }
+};
+
 module.exports = {
   verifyTransaction,
   verifyTransactionByRef,
@@ -193,5 +213,6 @@ module.exports = {
   createVirtualAccount,
   calculateFee,
   initializeStandardPayment,
+  getPayoutBalance,
 };
 

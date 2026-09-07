@@ -34,10 +34,24 @@ const handleWebhook = async (req, res, next) => {
 
       // 1.5 Handle Wallet Deposit
       if (txRef.includes('DEP') || txData.type === 'deposit') {
+        if (txData.status === 'completed') {
+          console.log(`ℹ️ Webhook: Deposit ${txRef} already marked completed. Skipping.`);
+          return res.status(200).json({ success: true, message: 'Wallet deposit already processed' });
+        }
+
         const userId = txData.userId || txData.tenantId;
         if (userId) {
           const walletRef = db.collection('wallets').doc(userId);
+          let alreadyHandled = false;
+
           await db.runTransaction(async (t) => {
+            const freshTx = await t.get(txDocRef);
+            if (freshTx.exists && freshTx.data().status === 'completed') {
+              console.log(`⚠️ Webhook: Deposit ${txRef} was completed concurrently. Skipping credit.`);
+              alreadyHandled = true;
+              return;
+            }
+
             const wDoc = await t.get(walletRef);
             const currentBal = wDoc.exists ? (wDoc.data().availableBalance || wDoc.data().balance || 0) : 0;
             t.set(walletRef, {
@@ -60,6 +74,10 @@ const handleWebhook = async (req, res, next) => {
             }, { merge: true });
           });
 
+          if (alreadyHandled) {
+            return res.status(200).json({ success: true, message: 'Wallet deposit already processed' });
+          }
+
           await sendPushNotification({
             userId: userId,
             title: '💰 Wallet Deposit Confirmed',
@@ -68,6 +86,12 @@ const handleWebhook = async (req, res, next) => {
           });
         }
         return res.status(200).json({ success: true, message: 'Wallet deposit processed' });
+      }
+
+      // 1.8 Guard against duplicate escrow processing
+      if (txData.status === 'held' || txData.status === 'completed' || txData.status === 'released') {
+        console.log(`ℹ️ Webhook: Transaction ${txRef} already ${txData.status}. Skipping duplicate escrow setup.`);
+        return res.status(200).json({ success: true, message: `Transaction already ${txData.status}` });
       }
 
       // 2. Financial Breakdown (5% Platform Fee, 95% Landlord Payout)
@@ -150,25 +174,93 @@ const handleWebhook = async (req, res, next) => {
       }
     }
 
-    // ── Handle successful withdrawal transfer ─────────────────────────────────
+    // ── Handle withdrawal transfer completion / failure webhook ───────────────
     if (payload.event === 'transfer.completed' && payload.data) {
       const transferRef = payload.data.reference;
-      const transferStatus = payload.data.status;
-      const transferAmount = payload.data.amount;
+      const transferStatus = (payload.data.status || '').toUpperCase();
+      const transferAmount = Number(payload.data.amount) || 0;
+      const failureReason = payload.data.complete_message || payload.data.narration || 'Transfer failed on payment gateway';
 
       console.log(`💸 Transfer webhook: ref=${transferRef} status=${transferStatus} amount=${transferAmount}`);
 
-      // Extract uid from reference format: WITHDRAW-{uid8}-{timestamp}
       if (transferRef && transferRef.startsWith('WITHDRAW-')) {
-        const parts = transferRef.split('-');
-        // parts[1] is the uid prefix
-        console.log(`✅ Withdrawal of ₦${transferAmount} completed for uid_prefix=${parts[1]}, status=${transferStatus}`);
+        const txDocRef = db.collection('transactions').doc(transferRef);
+        const txSnap = await txDocRef.get();
+        const txData = txSnap.exists ? txSnap.data() : null;
 
-        // If transfer FAILED, we need to refund the balance
-        if (transferStatus === 'FAILED') {
-          console.error(`❌ Transfer FAILED for ref=${transferRef}. Manual review needed.`);
-          // TODO: Implement automatic refund by looking up the withdrawal record
-          // For now, log for manual intervention
+        // Determine userId: from Firestore transaction doc, or fallback to parsing reference WITHDRAW-{uid}-{timestamp}
+        let userId = txData?.userId || txData?.tenantId;
+        if (!userId) {
+          const parts = transferRef.split('-');
+          if (parts.length >= 3) {
+            userId = parts.slice(1, -1).join('-');
+          }
+        }
+
+        if (transferStatus === 'SUCCESSFUL') {
+          console.log(`✅ Withdrawal of ₦${transferAmount} confirmed successful for ref=${transferRef}`);
+          if (txSnap.exists) {
+            await txDocRef.update({
+              status: 'completed',
+              payoutStatus: 'SUCCESSFUL',
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+
+          if (userId) {
+            await sendPushNotification({
+              userId: userId,
+              title: '💸 Withdrawal Successful',
+              message: `₦${transferAmount.toLocaleString()} has been deposited to your bank account.`,
+              data: { type: 'wallet', transactionId: transferRef },
+            });
+          }
+        } else if (transferStatus === 'FAILED') {
+          console.error(`❌ Transfer FAILED for ref=${transferRef}, reason=${failureReason}. Executing automatic refund...`);
+
+          // Idempotency: only refund if not already marked failed or refunded
+          if (txData && (txData.status === 'failed' || txData.status === 'refunded')) {
+            console.log(`ℹ️ Transfer ${transferRef} already refunded. Skipping duplicate refund.`);
+            return res.status(200).json({ success: true, message: 'Transfer already refunded' });
+          }
+
+          if (userId && transferAmount > 0) {
+            const walletRef = db.collection('wallets').doc(userId);
+            await db.runTransaction(async (t) => {
+              const freshTx = await t.get(txDocRef);
+              if (freshTx.exists && (freshTx.data().status === 'failed' || freshTx.data().status === 'refunded')) {
+                return; // already handled concurrently
+              }
+
+              const wDoc = await t.get(walletRef);
+              const currentBal = wDoc.exists ? (wDoc.data().availableBalance ?? wDoc.data().balance ?? 0) : 0;
+              const restoredBal = currentBal + transferAmount;
+
+              t.set(walletRef, {
+                uid: userId,
+                availableBalance: restoredBal,
+                balance: restoredBal,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }, { merge: true });
+
+              t.set(txDocRef, {
+                status: 'failed',
+                payoutStatus: 'FAILED',
+                failureReason: failureReason,
+                refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }, { merge: true });
+            });
+
+            await sendPushNotification({
+              userId: userId,
+              title: '⚠️ Withdrawal Unsuccessful — Funds Returned',
+              message: `Your withdrawal of ₦${transferAmount.toLocaleString()} could not be completed and has been refunded to your wallet. Reason: ${failureReason}.`,
+              data: { type: 'wallet', transactionId: transferRef },
+            });
+
+            console.log(`🔄 Automatically refunded ₦${transferAmount} back to user=${userId}`);
+          }
         }
       }
     }

@@ -111,10 +111,11 @@ const verifyPaymentByRef = async (req, res, next) => {
     }
 
     const txData = txDoc.data();
-    if (txData.status === 'held' || txData.status === 'successful' || txData.status === 'released') {
+    if (txData.status === 'completed' || txData.status === 'held' || txData.status === 'successful' || txData.status === 'released') {
       return res.status(200).json({
         verified: true,
-        status: 'successful'
+        status: txData.status === 'completed' ? 'completed' : 'successful',
+        message: 'Payment already verified and completed.',
       });
     }
 
@@ -130,6 +131,12 @@ const verifyPaymentByRef = async (req, res, next) => {
           if (userId) {
             const walletRef = db.collection('wallets').doc(userId);
             await db.runTransaction(async (t) => {
+              const freshTx = await t.get(txDoc.ref);
+              if (freshTx.exists && freshTx.data().status === 'completed') {
+                console.log(`⚠️ verifyPaymentByRef: Deposit ${transactionId} already completed in concurrent process.`);
+                return;
+              }
+
               const wDoc = await t.get(walletRef);
               const currentBal = wDoc.exists ? (wDoc.data().availableBalance || wDoc.data().balance || 0) : 0;
               t.set(walletRef, {
@@ -154,11 +161,17 @@ const verifyPaymentByRef = async (req, res, next) => {
           });
         }
 
-        await txDoc.ref.update({
-          status: 'held',
-          flutterwaveTxId: flwTx.id,
-          paidAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        await db.runTransaction(async (t) => {
+          const freshTx = await t.get(txDoc.ref);
+          if (freshTx.exists && (freshTx.data().status === 'held' || freshTx.data().status === 'successful' || freshTx.data().status === 'completed')) {
+            return;
+          }
+          t.update(txDoc.ref, {
+            status: 'held',
+            flutterwaveTxId: flwTx.id,
+            paidAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
         });
 
         return res.status(200).json({
@@ -246,7 +259,21 @@ const requestWithdrawal = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Missing bankCode or accountNumber.' });
     }
 
+    // ── Pre-flight Payout Balance Check ─────────────────────────────────────
+    // Query Flutterwave to check if the platform's payout balance has sufficient cleared funds
+    const flwBalance = await flutterwaveService.getPayoutBalance('NGN');
+    if (flwBalance && flwBalance.available_balance < amount) {
+      console.warn(`⚠️ Withdrawal blocked: Payout balance (₦${flwBalance.available_balance}) is less than requested ₦${amount}`);
+      return res.status(503).json({
+        success: false,
+        error: 'Automated bank transfers are temporarily undergoing routine liquidity replenishment. Please try again in a few minutes or contact support.',
+        code: 'INSUFFICIENT_PAYOUT_FLOAT',
+      });
+    }
+
     const walletRef = db.collection('wallets').doc(uid);
+    const reference = `WITHDRAW-${uid}-${Date.now()}`;
+    const txDocRef = db.collection('transactions').doc(reference);
 
     // Atomically check balance and reserve funds
     let reserved = false;
@@ -268,6 +295,23 @@ const requestWithdrawal = async (req, res, next) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
 
+      // Record pending withdrawal transaction
+      t.set(txDocRef, {
+        id: reference,
+        txRef: reference,
+        type: 'withdrawal',
+        userId: uid,
+        tenantId: uid, // for consistency in firestore security rules
+        amount: Math.round(amount),
+        currency: 'NGN',
+        status: 'pending',
+        payoutStatus: 'INITIATED',
+        bankCode: bankCode.trim(),
+        accountNumber: accountNumber.trim(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
       reserved = true;
     });
 
@@ -279,17 +323,34 @@ const requestWithdrawal = async (req, res, next) => {
         accountNumber: accountNumber.trim(),
         amount: Math.round(amount), // Flutterwave requires whole NGN amount
         narration: 'Agent Wallet Withdrawal',
-        reference: `WITHDRAW-${uid.slice(0, 8)}-${Date.now()}`,
+        reference: reference,
+      });
+
+      await txDocRef.update({
+        flutterwaveTransferId: payoutRes?.id || null,
+        payoutStatus: payoutRes?.status || 'QUEUED',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (payoutErr) {
-      // Payout failed — refund the reserved balance
+      // Payout failed — refund the reserved balance and mark transaction as failed
       if (reserved) {
         try {
-          await walletRef.set({
-            availableBalance: availableBalance,
-            balance: availableBalance,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          }, { merge: true });
+          await db.runTransaction(async (t) => {
+            const wSnap = await t.get(walletRef);
+            const cur = wSnap.exists ? (wSnap.data().availableBalance ?? wSnap.data().balance ?? 0) : 0;
+            t.set(walletRef, {
+              availableBalance: cur + amount,
+              balance: cur + amount,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+
+            t.set(txDocRef, {
+              status: 'failed',
+              payoutStatus: 'FAILED',
+              failureReason: payoutErr.message || 'Transfer rejected by payment gateway',
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+          });
         } catch (refundErr) {
           console.error(`CRITICAL: Balance reserved but payout AND refund both failed for uid=${uid}`, refundErr);
         }
@@ -304,7 +365,7 @@ const requestWithdrawal = async (req, res, next) => {
       success: true,
       message: `₦${amount} withdrawal initiated successfully.`,
       newBalance: availableBalance - amount,
-      reference: payoutRes?.id || payoutRes?.reference,
+      reference: payoutRes?.id || reference,
     });
   } catch (error) {
     next(error);
