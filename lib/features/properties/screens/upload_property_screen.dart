@@ -53,6 +53,7 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
   String listingType = 'Rent'; // Sell, Rent, Lease, Shortlet
   String rentalDurationUnit = 'Months'; // Hours, Days, Weeks, Months, Years
   final durationController = TextEditingController(text: '12');
+  bool allowsMonthlyPayment = true;
 
   List<File> selectedImages = [];
   File? selectedVideo;
@@ -142,6 +143,7 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
       listingType: typeVal,
       rentalDurationUnit: unitVal,
       rentalDurationValue: valueVal,
+      allowsMonthlyPayment: typeVal == 'rent' ? allowsMonthlyPayment : false,
     );
 
     setState(() => isLoading = false);
@@ -512,6 +514,101 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: allowsMonthlyPayment
+                        ? const Color(0xFF10B981).withValues(alpha: 0.5)
+                        : Colors.grey.shade200,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: allowsMonthlyPayment
+                            ? const Color(0xFFF0FDF4)
+                            : Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.calendar_month_rounded,
+                        color: allowsMonthlyPayment
+                            ? const Color(0xFF10B981)
+                            : Colors.grey.shade500,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Accept Monthly Rent',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'POPULAR',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF10B981),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Allow tenants to pay monthly via escrow. Boosts tenant inquiries by up to 400%.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: allowsMonthlyPayment,
+                      activeThumbColor: const Color(0xFF10B981),
+                      onChanged: (val) {
+                        setState(() {
+                          allowsMonthlyPayment = val;
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
 

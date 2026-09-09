@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:agent_app/shared/models/user_model.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
 
@@ -258,6 +259,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 );
 
                 if (confirm == true) {
+                  if (!context.mounted) return;
                   Navigator.pop(context); // close edit dialog
                   try {
                     await _firestore.collection('users').doc(user.uid).delete();
@@ -463,7 +465,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () => _editUser(user),
+                            onTap: () => context.push('/admin/customer-360', extra: {'userId': user.uid}),
                             child: Padding(
                               padding: const EdgeInsets.all(16),
                               child: Row(
@@ -547,8 +549,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                     ),
                                   ),
 
-                                  // Arrow indicator or Edit icon
-                                  Icon(Icons.edit_note_rounded, color: Colors.grey.shade300, size: 24),
+                                  // Quick Edit icon
+                                  IconButton(
+                                    icon: const Icon(Icons.tune_rounded, color: Color(0xFF6366F1), size: 20),
+                                    tooltip: 'Quick Edit Role / KYC',
+                                    onPressed: () => _editUser(user),
+                                  ),
+                                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey.shade300, size: 14),
                                 ],
                               ),
                             ),

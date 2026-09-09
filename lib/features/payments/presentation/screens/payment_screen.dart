@@ -11,6 +11,7 @@ import '../../../auth/presentation/providers/current_user_provider.dart';
 import '../../domain/escrow_status.dart';
 import '../widgets/payment_receipt_dialog.dart';
 import 'escrow_details_screen.dart';
+import 'rent_schedule_screen.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
@@ -26,11 +27,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final EscrowApiService escrowApiService = EscrowApiService();
   String _selectedMethod = 'bank_transfer';
   bool _isProcessing = false;
+  String _paymentPlan = 'monthly'; // 'monthly' | 'annual'
 
-  double get _rentAmount => widget.property.price.toDouble();
-  double get _agencyFee => _rentAmount * 0.20; // 20% Agency Fee
-  double get _platformFee => _rentAmount * 0.05; // 5% Escrow Protection
-  double get _subtotal => _rentAmount + _agencyFee + _platformFee;
+  bool get _allowsMonthly =>
+      widget.property.allowsMonthlyPayment && widget.property.listingType == 'rent';
+  bool get _isMonthlyPlan => _allowsMonthly && _paymentPlan == 'monthly';
+
+  // Annual calculation
+  double get _annualRentAmount => widget.property.price.toDouble();
+  double get _annualAgencyFee => _annualRentAmount * 0.20; // 20% Agency Fee
+  double get _annualPlatformFee => _annualRentAmount * 0.05; // 5% Escrow Protection
+  double get _annualSubtotal => _annualRentAmount + _annualAgencyFee + _annualPlatformFee;
+
+  // Monthly calculation (Month 1: 1st month rent + 1 month security deposit + 5% platform escrow)
+  double get _monthlyRentAmount => widget.property.monthlyPrice.toDouble();
+  double get _monthlySecurityDeposit => _monthlyRentAmount; // 1-month refundable security deposit
+  double get _monthlyPlatformFee => _monthlyRentAmount * 0.05; // 5% monthly escrow fee
+  double get _monthlySubtotal => _monthlyRentAmount + _monthlySecurityDeposit + _monthlyPlatformFee;
+
+  double get _rentAmount => _isMonthlyPlan ? _monthlyRentAmount : _annualRentAmount;
+  double get _agencyFee => _isMonthlyPlan ? 0 : _annualAgencyFee;
+  double get _platformFee => _isMonthlyPlan ? _monthlyPlatformFee : _annualPlatformFee;
+  double get _subtotal => _isMonthlyPlan ? _monthlySubtotal : _annualSubtotal;
   double get _totalPackage => _subtotal;
 
   String _formatCurrency(num amount) {
@@ -125,8 +143,35 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (modalContext) {
+        String? createdSubscriptionId;
+
         return StatefulBuilder(
           builder: (context, setModalState) {
+            Future<void> onPaymentConfirmed() async {
+              if (_isMonthlyPlan && createdSubscriptionId == null) {
+                final currentUser = ref.read(currentUserProvider);
+                if (currentUser != null) {
+                  try {
+                    final subRepo = ref.read(rentSubscriptionRepositoryProvider);
+                    createdSubscriptionId = await subRepo.createSubscription(
+                      tenantId: currentUser.uid,
+                      landlordId: widget.property.ownerId,
+                      propertyId: widget.property.id,
+                      propertyTitle: widget.property.title,
+                      propertyAddress: widget.property.location,
+                      monthlyAmount: _monthlyRentAmount,
+                      annualAmount: _annualRentAmount,
+                      securityDeposit: _monthlySecurityDeposit,
+                      platformFee: _monthlyPlatformFee,
+                      initialTransactionId: transactionId,
+                    );
+                  } catch (e) {
+                    debugPrint('Error creating subscription: $e');
+                  }
+                }
+              }
+            }
+
             // Background Automated Detection Polling Timer
             pollTimer ??= Timer.periodic(const Duration(seconds: 4), (timer) async {
               if (isVerified || !modalContext.mounted) {
@@ -137,6 +182,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 final success = await ref.read(paymentControllerProvider).verifyPaymentTransfer(transactionId: transactionId);
                 if (success && modalContext.mounted && !isVerified) {
                   timer.cancel();
+                  await onPaymentConfirmed();
                   setModalState(() {
                     isVerified = true;
                     isVerifying = false;
@@ -369,6 +415,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                 setModalState(() => isVerifying = true);
                                 try {
                                   await ref.read(paymentControllerProvider).verifyPaymentTransfer(transactionId: transactionId);
+                                  await onPaymentConfirmed();
                                   setModalState(() {
                                     isVerifying = false;
                                     isVerified = true;
@@ -492,6 +539,43 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         ),
                       ),
                     ),
+
+                    if (_isMonthlyPlan) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(modalContext);
+                            if (createdSubscriptionId != null) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => RentScheduleScreen(subscriptionId: createdSubscriptionId!),
+                                ),
+                              );
+                            } else {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => EscrowDetailsScreen(transactionId: transactionId),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.calendar_month_rounded, color: Colors.white),
+                          label: const Text(
+                            'View 12-Month Rental Schedule 📅',
+                            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -547,6 +631,120 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Payment Plan Selector (Annual vs Monthly) ────────
+              if (_allowsMonthly) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _paymentPlan = 'monthly'),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _isMonthlyPlan ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: _isMonthlyPlan
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.05),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.calendar_month_rounded,
+                                  size: 18,
+                                  color: _isMonthlyPlan ? const Color(0xFF10B981) : Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Monthly Plan',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isMonthlyPlan ? const Color(0xFF0F172A) : Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'POPULAR',
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF10B981),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _paymentPlan = 'annual'),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: !_isMonthlyPlan ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: !_isMonthlyPlan
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.05),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.all_inclusive_rounded,
+                                  size: 18,
+                                  color: !_isMonthlyPlan ? const Color(0xFF6366F1) : Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Full Annual',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: !_isMonthlyPlan ? const Color(0xFF0F172A) : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               // Property Invoice Card
               Container(
                 width: double.infinity,
@@ -609,23 +807,51 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Rent Amount', style: TextStyle(color: Colors.black54, fontSize: 13)),
-                        Text('₦${_formatCurrency(_rentAmount)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        Text(
+                          _isMonthlyPlan ? 'Month 1 Rent' : 'Rent Amount (1 Year)',
+                          style: const TextStyle(color: Colors.black54, fontSize: 13),
+                        ),
+                        Text(
+                          '₦${_formatCurrency(_rentAmount)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
                       ],
                     ),
+                    if (_isMonthlyPlan) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Refundable Caution Deposit (1 Mo)',
+                            style: TextStyle(color: Colors.black54, fontSize: 13),
+                          ),
+                          Text(
+                            '₦${_formatCurrency(_monthlySecurityDeposit)}',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Agency & Agent Fee (20%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                          Text('₦${_formatCurrency(_agencyFee)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Agency & Agent Fee (20%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
-                        Text('₦${_formatCurrency(_agencyFee)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Escrow & Platform Protection (5%)', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                        Text(
+                          _isMonthlyPlan
+                              ? 'Monthly Escrow Protection (5%)'
+                              : 'Escrow & Platform Protection (5%)',
+                          style: const TextStyle(color: Colors.black54, fontSize: 13),
+                        ),
                         Text('₦${_formatCurrency(_platformFee)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       ],
                     ),
@@ -643,9 +869,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Subtotal Package',
-                          style: TextStyle(
+                        Text(
+                          _isMonthlyPlan ? 'Initial Package Due Today' : 'Subtotal Package',
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
                             color: Color(0xFF0F172A),
@@ -661,6 +887,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         ),
                       ],
                     ),
+                    if (_isMonthlyPlan) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF10B981)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Initial package covers Month 1 rent + Refundable security deposit. Next 11 installments will be ₦${_formatCurrency(_monthlyRentAmount)}/mo.',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A), height: 1.3),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

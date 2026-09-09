@@ -8,11 +8,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // isSuperAdmin() verifies if the user is a designated super administrator.
+    function isSuperAdmin() {
+      return signedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+    }
+
     // isAdmin() reads the user's role from Firestore.
-    // The role field itself is now protected against self-writing (see users rule).
+    // Returns true for both operational admins and super admins.
     function isAdmin() {
       return signedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin']);
     }
 
     function isOwner(uid) {
@@ -30,14 +36,17 @@ service cloud.firestore {
       // (owner + admin only, see below).
       allow read: if signedIn();
 
-      // Owner can create their own profile — but cannot give themselves admin role.
+      // Owner can create their own profile — but cannot give themselves admin or super_admin role.
       allow create: if isOwner(uid) &&
-        (!('role' in request.resource.data) || request.resource.data.role != 'admin') &&
+        (!('role' in request.resource.data) || !(request.resource.data.role in ['admin', 'super_admin'])) &&
         !('bankDetails' in request.resource.data);
 
+      // SuperAdmin can update any profile and change user roles.
+      // Standard admin can update profiles but cannot modify role.
       // Owner can update their own profile BUT cannot change the `role` field,
       // and cannot smuggle bank details back onto this document.
-      allow update: if isAdmin() ||
+      allow update: if isSuperAdmin() ||
+        (isAdmin() && (!('role' in request.resource.data) || request.resource.data.role == resource.data.role)) ||
         (isOwner(uid) &&
          request.resource.data.role == resource.data.role &&
          !('bankDetails' in request.resource.data.diff(resource.data).affectedKeys()));
@@ -221,6 +230,23 @@ service cloud.firestore {
         isAdmin()
       );
       allow write: if isAdmin();
+    }
+
+    // ──────────────────────────────────────────
+    // Platform Settings (Super Admin Only)
+    // ──────────────────────────────────────────
+    match /platform_settings/{settingId} {
+      allow read: if signedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // ──────────────────────────────────────────
+    // Audit Logs (System & Super Admin)
+    // ──────────────────────────────────────────
+    match /audit_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if signedIn();
+      allow update, delete: if false; // Immutable audit logs
     }
 
     // ──────────────────────────────────────────

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/current_user_provider.dart';
+import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../../admin/screens/admin_support_tickets_screen.dart';
 import '../../../admin/screens/admin_behavior_logs_screen.dart';
 import '../../../admin/screens/customer_support_dashboard_screen.dart';
@@ -218,6 +219,28 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           ],
         ),
         actions: [
+          Consumer(
+            builder: (context, ref, _) {
+              final profile = ref.watch(profileProvider).valueOrNull;
+              final isSuperAdmin = profile?['role'] == 'super_admin';
+              if (!isSuperAdmin) return const SizedBox.shrink();
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 6, top: 10, bottom: 10),
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A),
+                    foregroundColor: const Color(0xFF38BDF8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.shield_rounded, size: 14),
+                  label: const Text('Super Admin', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  onPressed: () => context.push('/super-admin'),
+                ),
+              );
+            },
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 12, top: 4),
             child: IconButton(
@@ -472,6 +495,29 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   color: Colors.redAccent.shade700,
                   badgeCount: 0,
                   onTap: () => context.push('/admin/security'),
+                ),
+                const SizedBox(height: 12),
+
+                Consumer(
+                  builder: (context, ref, _) {
+                    final profile = ref.watch(profileProvider).valueOrNull;
+                    final isSuperAdmin = profile?['role'] == 'super_admin';
+                    if (!isSuperAdmin) return const SizedBox.shrink();
+
+                    return Column(
+                      children: [
+                        _buildAdminActionTile(
+                          title: 'Super Admin Governance Console',
+                          subtitle: 'Platform parameters, commission rates, staff roles & audit logs',
+                          icon: Icons.shield_rounded,
+                          color: const Color(0xFF0F172A),
+                          badgeCount: 0,
+                          onTap: () => context.push('/super-admin'),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 40),
               ],

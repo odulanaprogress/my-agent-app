@@ -487,6 +487,65 @@ class _PropertyDetailsScreenState
                           ),
                         ],
                       ),
+                      if (p.listingType == 'rent' && p.allowsMonthlyPayment) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_month_rounded,
+                                color: Color(0xFF10B981),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: const TextStyle(
+                                      color: Color(0xFF0F172A),
+                                      fontSize: 12,
+                                    ),
+                                    children: [
+                                      const TextSpan(text: 'Or pay '),
+                                      TextSpan(
+                                        text: '₦${_formatPrice(p.monthlyPrice)}/month',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF10B981),
+                                        ),
+                                      ),
+                                      const TextSpan(text: ' in 12-month escrow installments'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'FLEXIBLE',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

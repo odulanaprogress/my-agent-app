@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/payment_repository.dart';
 import '../data/wallet_repository.dart';
 import '../data/escrow_repository.dart';
+import '../data/rent_subscription_repository.dart';
+import '../models/rent_subscription_model.dart';
 import '../data/transaction_model.dart';
 import '../domain/escrow_status.dart';
 
@@ -237,4 +239,22 @@ final landlordTransactionsProvider = StreamProvider<List<TransactionModel>>((ref
 final adminTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
   final repo = ref.watch(paymentRepositoryProvider);
   return repo.getAllTransactions();
+});
+
+final rentSubscriptionRepositoryProvider = Provider<RentSubscriptionRepository>((ref) {
+  return RentSubscriptionRepository();
+});
+
+final tenantRentSubscriptionsProvider = StreamProvider<List<RentSubscriptionModel>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return Stream.value([]);
+  final repo = ref.watch(rentSubscriptionRepositoryProvider);
+  return repo.getTenantSubscriptions(user.uid);
+});
+
+final landlordRentSubscriptionsProvider = StreamProvider<List<RentSubscriptionModel>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return Stream.value([]);
+  final repo = ref.watch(rentSubscriptionRepositoryProvider);
+  return repo.getLandlordSubscriptions(user.uid);
 });

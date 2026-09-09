@@ -78,6 +78,7 @@ class PropertyRepository {
     String listingType = 'rent',
     String? rentalDurationUnit,
     int? rentalDurationValue,
+    bool allowsMonthlyPayment = true,
   }) async {
     try {
       final currentUser = auth.currentUser;
@@ -139,6 +140,7 @@ class PropertyRepository {
         listingType: listingType,
         rentalDurationUnit: rentalDurationUnit,
         rentalDurationValue: rentalDurationValue,
+        allowsMonthlyPayment: allowsMonthlyPayment,
       );
 
       final propertyMap = property.toMap();

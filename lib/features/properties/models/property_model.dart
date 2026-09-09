@@ -35,6 +35,10 @@ class PropertyModel {
   final String listingType; // sell | rent | lease | shortlet
   final String? rentalDurationUnit; // hours | days | weeks | months | years
   final int? rentalDurationValue;
+  final bool allowsMonthlyPayment;
+
+  /// Computed flexible monthly installment rate (inclusive of platform escrow reserve)
+  num get monthlyPrice => (price / 12 * 1.05).round();
 
   // Backwards-compatible computed fields (to keep legacy UI compiling).
   // These will be removed once the UI is fully migrated to the new schema.
@@ -70,6 +74,7 @@ class PropertyModel {
     this.listingType = 'rent',
     this.rentalDurationUnit,
     this.rentalDurationValue,
+    this.allowsMonthlyPayment = true,
   });
 
   Map<String, dynamic> toMap() {
@@ -96,6 +101,7 @@ class PropertyModel {
       'listingType': listingType,
       'rentalDurationUnit': rentalDurationUnit,
       'rentalDurationValue': rentalDurationValue,
+      'allowsMonthlyPayment': allowsMonthlyPayment,
     };
   }
 
@@ -161,6 +167,7 @@ class PropertyModel {
       listingType: map['listingType'] ?? 'rent',
       rentalDurationUnit: map['rentalDurationUnit'],
       rentalDurationValue: map['rentalDurationValue'] != null ? parseInt(map['rentalDurationValue']) : null,
+      allowsMonthlyPayment: map['allowsMonthlyPayment'] ?? true,
     );
   }
 }

@@ -83,6 +83,11 @@ class _CustomerSupportDashboardScreenState
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.person_search_rounded, color: Colors.white),
+            tooltip: 'Customer 360 Lookup',
+            onPressed: () => context.push('/admin/customer-360'),
+          ),
+          IconButton(
             iconSize: 20,
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.logout_rounded, color: Colors.white70, size: 20),
@@ -489,6 +494,33 @@ class _TicketDetailSheetState extends State<_TicketDetailSheet> {
                   _infoRow('Email', widget.data['userEmail'] ?? 'N/A'),
                   _infoRow('Subject', widget.data['subject'] ?? 'No subject'),
                   _infoRow('Status', widget.data['status'] ?? 'open'),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () {
+                      final uid = widget.data['userId'] ?? widget.data['uid'];
+                      Navigator.pop(context);
+                      context.push('/admin/customer-360', extra: {'userId': uid});
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.person_search_rounded, color: Color(0xFF38BDF8), size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            'Inspect Customer 360° Profile',
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Text('Message:',
                       style: TextStyle(

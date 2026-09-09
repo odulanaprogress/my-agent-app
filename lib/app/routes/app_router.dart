@@ -53,8 +53,17 @@ import '../../features/ai/screens/ai_chat_screen.dart';
 import '../../features/payments/screens/bank_account_setup_screen.dart';
 import '../../features/admin/screens/customer_support_dashboard_screen.dart';
 import '../../features/admin/screens/admin_behavior_logs_screen.dart';
+import '../../features/admin/screens/customer_360_screen.dart';
 import '../../features/legal/presentation/screens/tenancy_agreement_screen.dart';
 import '../../features/legal/presentation/screens/rental_countdown_screen.dart';
+import '../../features/payments/presentation/screens/rent_schedule_screen.dart';
+
+import '../../features/super_admin/presentation/screens/super_admin_dashboard.dart';
+import '../../features/super_admin/presentation/screens/platform_settings_screen.dart';
+import '../../features/super_admin/presentation/screens/audit_logs_screen.dart';
+import '../../features/super_admin/presentation/screens/feature_flags_screen.dart';
+import '../../features/super_admin/presentation/screens/system_health_screen.dart';
+import '../../features/super_admin/presentation/screens/fraud_monitoring_screen.dart';
 
 // ── Protected paths ───────────────────────────────────────────────────────────
 const _protectedPaths = {
@@ -63,6 +72,7 @@ const _protectedPaths = {
   '/admin',
   '/admin/users',
   '/admin/security',
+  '/admin/customer-360',
   '/favorites',
   '/profile',
   '/edit-profile',
@@ -88,6 +98,12 @@ const _protectedPaths = {
   '/admin/behavior-logs',
   '/tenancy-agreement',
   '/my-rentals',
+  '/super-admin',
+  '/super-admin/settings',
+  '/super-admin/audit-logs',
+  '/super-admin/flags',
+  '/super-admin/diagnostics',
+  '/super-admin/fraud',
 };
 
 // ── Auth-backed Listenable so GoRouter reacts to login/logout ────────────────
@@ -101,11 +117,13 @@ class _AuthChangeNotifier extends ChangeNotifier {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roleSub;
 
   bool isAdmin = false;
+  bool isSuperAdmin = false;
 
   _AuthChangeNotifier() {
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
       _roleSub?.cancel();
       isAdmin = false;
+      isSuperAdmin = false;
 
       if (user != null) {
         _roleSub = FirebaseFirestore.instance
@@ -114,9 +132,11 @@ class _AuthChangeNotifier extends ChangeNotifier {
             .snapshots()
             .listen((snap) {
           final role = snap.data()?['role'] as String?;
-          final newIsAdmin = role == 'admin';
-          if (newIsAdmin != isAdmin) {
+          final newIsSuperAdmin = role == 'super_admin';
+          final newIsAdmin = role == 'admin' || newIsSuperAdmin;
+          if (newIsAdmin != isAdmin || newIsSuperAdmin != isSuperAdmin) {
             isAdmin = newIsAdmin;
+            isSuperAdmin = newIsSuperAdmin;
             notifyListeners();
           }
         });
@@ -160,6 +180,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       // data once there.
       final isAdminPath = path == '/admin' || path.startsWith('/admin/');
       if (isAdminPath && (!isAuthenticated || !authNotifier.isAdmin)) {
+        return '/login';
+      }
+
+      final isSuperAdminPath = path == '/super-admin' || path.startsWith('/super-admin/');
+      if (isSuperAdminPath && (!isAuthenticated || !authNotifier.isSuperAdmin)) {
         return '/login';
       }
 
@@ -260,6 +285,38 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/security',
         builder: (context, state) => const AdminSecurityDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/admin/customer-360',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final uid = extra?['userId'] as String? ?? state.uri.queryParameters['uid'];
+          return Customer360Screen(initialUserId: uid);
+        },
+      ),
+      GoRoute(
+        path: '/super-admin',
+        builder: (context, state) => const SuperAdminDashboard(),
+      ),
+      GoRoute(
+        path: '/super-admin/settings',
+        builder: (context, state) => const PlatformSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/super-admin/audit-logs',
+        builder: (context, state) => const AuditLogsScreen(),
+      ),
+      GoRoute(
+        path: '/super-admin/flags',
+        builder: (context, state) => const FeatureFlagsScreen(),
+      ),
+      GoRoute(
+        path: '/super-admin/diagnostics',
+        builder: (context, state) => const SystemHealthScreen(),
+      ),
+      GoRoute(
+        path: '/super-admin/fraud',
+        builder: (context, state) => const FraudMonitoringScreen(),
       ),
       GoRoute(
         path: '/notifications',
@@ -378,6 +435,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/my-rentals',
         builder: (context, state) => const RentalCountdownScreen(),
+      ),
+      GoRoute(
+        path: '/rent-schedule/:subscriptionId',
+        builder: (context, state) => RentScheduleScreen(
+          subscriptionId: state.pathParameters['subscriptionId'] ?? '',
+        ),
       ),
 
       // Fallback
