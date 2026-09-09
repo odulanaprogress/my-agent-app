@@ -106,6 +106,16 @@ class _AuthSplashScreenState extends ConsumerState<AuthSplashScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 8),
+            const Text(
+              'Beyond Housing',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF64748B),
+                letterSpacing: 0.5,
+              ),
+            ),
           ],
         ),
       ),

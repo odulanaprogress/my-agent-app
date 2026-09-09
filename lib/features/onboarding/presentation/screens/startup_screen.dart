@@ -95,13 +95,14 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Nigeria’s Trusted Real Estate Platform',
+              'Beyond Housing',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
                 color: Color(0xFF0B3D2E),
                 height: 1.4,
+                letterSpacing: 0.5,
               ),
             ),
             const SizedBox(height: 40),

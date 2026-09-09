@@ -180,13 +180,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         color: Color(0xFF0F172A),
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Beyond Housing',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Text(
                       'Welcome back — let\'s find your dream property',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.grey.shade600,
-                        fontSize: 14,
+                        fontSize: 13,
                       ),
                     ),
                   ],

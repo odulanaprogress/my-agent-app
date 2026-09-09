@@ -67,8 +67,11 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Nigeria\'s Trusted Real Estate Platform',
-              style: AppTextStyles.body.copyWith(color: Colors.white70),
+              'Beyond Housing',
+              style: AppTextStyles.body.copyWith(
+                color: Colors.white70,
+                letterSpacing: 0.5,
+              ),
             ),
             const SizedBox(height: 40),
             AppLoader(size: 24),

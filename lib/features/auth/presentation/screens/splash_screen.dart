@@ -70,8 +70,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             ),
             const SizedBox(height: 10),
             const Text(
-              'Secure Real Estate Marketplace',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
+              'Beyond Housing',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 50),
             const AppLoader(size: 56),
