@@ -39,127 +39,141 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (user == null) {
         _ref.read(currentUserProvider.notifier).state = null;
         state = state.copyWith(status: AuthStatus.unauthenticated);
-        try { OneSignal.logout(); } catch (_) {}
+        if (!kIsWeb) {
+          try { OneSignal.logout(); } catch (_) {}
+        }
         return;
       }
 
       // Link this device to the user's Firebase UID so OneSignal can target them
-      try { OneSignal.login(user.uid); } catch (_) {}
+      if (!kIsWeb) {
+        try { OneSignal.login(user.uid); } catch (_) {}
+      }
 
+      final cacheService = UserCacheService();
+      UserModel? cachedProfile;
       try {
-        final cacheService = UserCacheService();
-        var cachedProfile = await cacheService.getCachedUser();
-
+        cachedProfile = await cacheService.getCachedUser();
         if (cachedProfile != null && cachedProfile.uid == user.uid) {
           _ref.read(currentUserProvider.notifier).state = cachedProfile;
           state = state.copyWith(status: AuthStatus.authenticated);
-        } else if (cachedProfile != null) {
-          await cacheService.clearCache();
-          cachedProfile = null;
         }
+      } catch (e) {
+        debugPrint('[AuthNotifier] Cache read error: $e');
+      }
 
-        var profile = await _userFirestoreService.getUserProfile(user.uid);
+      UserModel? profile;
+      try {
+        profile = await _userFirestoreService.getUserProfile(user.uid);
+      } catch (e) {
+        debugPrint('[AuthNotifier] Firestore getUserProfile error: $e');
+      }
 
-        if (user.email != null && user.email!.trim().toLowerCase() == 'agentadminsupport@gmail.com') {
-          if (profile == null) {
-            final adminProfile = UserModel(
-              uid: user.uid,
-              email: 'agentadminsupport@gmail.com',
-              fullName: 'Platform Admin',
-              role: 'admin',
-              isVerified: true,
-              privacyAccepted: true,
-              onboardingCompleted: true,
-              createdAt: DateTime.now(),
-            );
+      final userEmail = user.email?.trim().toLowerCase() ?? '';
+
+      // Auto-assign roles for system emails
+      if (userEmail == 'agentadminsupport@gmail.com') {
+        if (profile == null) {
+          final adminProfile = UserModel(
+            uid: user.uid,
+            email: 'agentadminsupport@gmail.com',
+            fullName: user.displayName ?? 'Platform Admin',
+            role: 'admin',
+            isVerified: true,
+            privacyAccepted: true,
+            onboardingCompleted: true,
+            createdAt: DateTime.now(),
+          );
+          try {
             await _userFirestoreService.createUserProfile(adminProfile);
-            profile = adminProfile;
-          } else if (profile.role != 'admin') {
+          } catch (_) {}
+          profile = adminProfile;
+        } else if (profile.role != 'admin') {
+          try {
             await FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
                 .update({'role': 'admin'});
             profile = await _userFirestoreService.getUserProfile(user.uid);
-          }
-        } else if (user.email != null && user.email!.trim().toLowerCase() == 'agentcustomercare@gmail.com') {
-          if (profile == null) {
-            final supportProfile = UserModel(
-              uid: user.uid,
-              email: 'agentcustomercare@gmail.com',
-              fullName: 'Customer Care Support',
-              role: 'customer_support',
-              isVerified: true,
-              privacyAccepted: true,
-              onboardingCompleted: true,
-              createdAt: DateTime.now(),
-            );
+          } catch (_) {}
+        }
+      } else if (userEmail == 'agentcustomercare@gmail.com') {
+        if (profile == null) {
+          final supportProfile = UserModel(
+            uid: user.uid,
+            email: 'agentcustomercare@gmail.com',
+            fullName: user.displayName ?? 'Customer Care Support',
+            role: 'customer_support',
+            isVerified: true,
+            privacyAccepted: true,
+            onboardingCompleted: true,
+            createdAt: DateTime.now(),
+          );
+          try {
             await _userFirestoreService.createUserProfile(supportProfile);
-            profile = supportProfile;
-          } else if (profile.role != 'customer_support') {
+          } catch (_) {}
+          profile = supportProfile;
+        } else if (profile.role != 'customer_support') {
+          try {
             await FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
                 .update({'role': 'customer_support'});
             profile = await _userFirestoreService.getUserProfile(user.uid);
-          }
+          } catch (_) {}
         }
+      }
 
-        // If user doc is missing, auto-create a basic profile so the user
-        // isn't stuck in a loading/error loop. They can update it later.
-        if (profile == null && cachedProfile == null) {
-          debugPrint('[AuthNotifier] No profile found for ${user.uid} — auto-creating.');
-          final autoProfile = UserModel(
-            uid: user.uid,
-            email: user.email ?? '',
-            fullName: user.displayName ?? user.email?.split('@').first ?? 'User',
-            role: 'tenant', // safe default; role-selection screen can update this
-            isVerified: user.emailVerified,
-            privacyAccepted: true,
-            onboardingCompleted: false,
-            createdAt: DateTime.now(),
-          );
-          try {
-            await _userFirestoreService.createUserProfile(autoProfile);
-            profile = autoProfile;
-          } catch (e) {
-            debugPrint('[AuthNotifier] Failed to auto-create profile: $e');
-            // Still set the in-memory profile so they can at least see the app
-            _ref.read(currentUserProvider.notifier).state = autoProfile;
-            state = state.copyWith(status: AuthStatus.authenticated);
-            return;
-          }
-        }
-
-        if (profile != null) {
-          await cacheService.saveUser(profile);
-          _ref.read(currentUserProvider.notifier).state = profile;
-          state = state.copyWith(status: AuthStatus.authenticated);
-        } else if (cachedProfile != null) {
-          profile = cachedProfile;
-        }
-        
-        UserBehaviorService.logLogin(method: 'email_or_google');
-
-        // OneSignal & push notifications — all platforms
-        try {
-          OneSignal.login(user.uid);
-          final granted = await OneSignal.Notifications.requestPermission(true);
-          if (granted) {
-            await Future.delayed(const Duration(seconds: 4));
-            await OneSignalApiService.sendNotification(
-              receiverUids: [user.uid],
-              heading: 'Welcome Back!',
-              content: 'You have successfully logged in to AGENT.',
-            );
-          }
-        } catch (e) {
-          debugPrint('Push notification error: $e');
-        }
-      } catch (e) {
-        state = state.copyWith(
-          status: AuthStatus.error,
-          errorMessage: e.toString(),
+      // If user doc is missing from Firestore, auto-create a basic profile
+      if (profile == null) {
+        debugPrint('[AuthNotifier] No profile found for ${user.uid} — creating fallback.');
+        final autoProfile = cachedProfile ?? UserModel(
+          uid: user.uid,
+          email: user.email ?? '',
+          fullName: user.displayName ?? (user.email != null && user.email!.contains('@') ? user.email!.split('@').first : 'User'),
+          role: (userEmail == 'agentadminsupport@gmail.com') ? 'admin' : 'tenant',
+          isVerified: user.emailVerified,
+          privacyAccepted: true,
+          onboardingCompleted: false,
+          createdAt: DateTime.now(),
         );
+
+        profile = autoProfile;
+        try {
+          await _userFirestoreService.createUserProfile(autoProfile);
+        } catch (e) {
+          debugPrint('[AuthNotifier] Failed to persist profile to Firestore: $e');
+        }
+      }
+
+      // Settle authenticated state safely
+      try {
+        await cacheService.saveUser(profile);
+      } catch (_) {}
+
+      _ref.read(currentUserProvider.notifier).state = profile;
+      state = state.copyWith(status: AuthStatus.authenticated);
+
+      // Background telemetry & welcome notification — never block auth
+      try {
+        UserBehaviorService.logLogin(method: 'email_or_google');
+      } catch (_) {}
+
+      if (!kIsWeb) {
+        Future.microtask(() async {
+          try {
+            final granted = await OneSignal.Notifications.requestPermission(true);
+            if (granted) {
+              await OneSignalApiService.sendNotification(
+                receiverUids: [user.uid],
+                heading: 'Welcome Back!',
+                content: 'You have successfully logged in to AGENT.',
+              );
+            }
+          } catch (e) {
+            debugPrint('Push notification background error: $e');
+          }
+        });
       }
     });
   }

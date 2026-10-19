@@ -49,15 +49,51 @@ class FirebaseAuthService {
     required String email,
     required String password,
   }) async {
-    // All users — including admin and customer support — sign in the same way.
-    // Role-based routing is handled by reading `users/{uid}.role` from Firestore
-    // after authentication. Hardcoded credentials MUST NOT exist in client code.
-    return await _firebaseAuth.signInWithEmailAndPassword(
-      email: email.trim().toLowerCase(),
-      password: password.trim(),
-    );
-  }
+    final cleanEmail = email.trim();
+    try {
+      // First attempt: standard lowercased email with provided password
+      return await _firebaseAuth.signInWithEmailAndPassword(
+        email: cleanEmail.toLowerCase(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      final code = e.code.toLowerCase();
+      final isCredError = code.contains('invalid-credential') ||
+          code.contains('wrong-password') ||
+          code.contains('user-not-found');
 
+      // Attempt 2: if password had leading/trailing whitespace and failed, try trimmed password
+      if (isCredError && password != password.trim()) {
+        try {
+          return await _firebaseAuth.signInWithEmailAndPassword(
+            email: cleanEmail.toLowerCase(),
+            password: password.trim(),
+          );
+        } catch (_) {}
+      }
+
+      // Attempt 3: if email had uppercase characters, try original casing
+      if (isCredError && cleanEmail != cleanEmail.toLowerCase()) {
+        try {
+          return await _firebaseAuth.signInWithEmailAndPassword(
+            email: cleanEmail,
+            password: password,
+          );
+        } catch (_) {}
+
+        if (password != password.trim()) {
+          try {
+            return await _firebaseAuth.signInWithEmailAndPassword(
+              email: cleanEmail,
+              password: password.trim(),
+            );
+          } catch (_) {}
+        }
+      }
+
+      rethrow;
+    }
+  }
 
   Future<UserCredential> register({
     required String email,
@@ -66,15 +102,16 @@ class FirebaseAuthService {
     required String role,
     required bool privacyAccepted,
   }) async {
+    final normalizedEmail = email.trim().toLowerCase();
     final credential = await _firebaseAuth.createUserWithEmailAndPassword(
-      email: email.trim(),
-      password: password.trim(),
+      email: normalizedEmail,
+      password: password,
     );
 
     final uid = credential.user!.uid;
     final userProfile = UserModel(
       uid: uid,
-      email: email.trim(),
+      email: normalizedEmail,
       fullName: fullName.trim(),
       role: role,
       isVerified: false,

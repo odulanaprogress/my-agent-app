@@ -47,21 +47,41 @@ class UserModel {
     };
   }
 
-  factory UserModel.fromMap(Map<String, dynamic> map) {
+  factory UserModel.fromMap(Map<String, dynamic> map, [String? docId]) {
+    final email = (map['email'] ?? '').toString();
+    final fullName = (map['fullName'] ??
+            map['displayName'] ??
+            map['name'] ??
+            (email.isNotEmpty ? email.split('@').first : 'User'))
+        .toString();
+
     return UserModel(
-      uid: map['uid'] ?? '',
-      email: map['email'] ?? '',
-      fullName: map['fullName'] ?? '',
-      role: map['role'] ?? 'tenant',
-      profileImage: map['profileImage'] ?? map['profileImageUrl'] ?? map['photoUrl'] ?? map['avatarUrl'],
+      uid: (map['uid'] ?? docId ?? '').toString(),
+      email: email,
+      fullName: fullName,
+      role: (map['role'] ?? 'tenant').toString(),
+      profileImage: map['profileImage']?.toString() ??
+          map['profileImageUrl']?.toString() ??
+          map['photoUrl']?.toString() ??
+          map['avatarUrl']?.toString(),
       favoritesCount: (map['favoritesCount'] is int)
           ? (map['favoritesCount'] as int)
           : int.tryParse('${map['favoritesCount'] ?? 0}') ?? 0,
-      isVerified: map['isVerified'] ?? false,
-      privacyAccepted: map['privacyAccepted'] ?? false,
-      onboardingCompleted: map['onboardingCompleted'] ?? false,
+      isVerified: _parseBool(map['isVerified'] ?? map['verificationStatus'], false),
+      privacyAccepted: _parseBool(map['privacyAccepted'], true),
+      onboardingCompleted: _parseBool(map['onboardingCompleted'], false),
       createdAt: _parseDateTime(map['createdAt']),
     );
+  }
+
+  static bool _parseBool(dynamic value, [bool fallback = false]) {
+    if (value == null) return fallback;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final s = value.toString().trim().toLowerCase();
+    if (s == 'true' || s == '1' || s == 'yes' || s == 'approved' || s == 'verified') return true;
+    if (s == 'false' || s == '0' || s == 'no' || s == 'rejected' || s == 'pending') return false;
+    return fallback;
   }
 
   static DateTime _parseDateTime(dynamic value) {
@@ -72,3 +92,4 @@ class UserModel {
     return DateTime.tryParse(s) ?? DateTime.fromMillisecondsSinceEpoch(0);
   }
 }
+

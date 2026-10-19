@@ -26,31 +26,32 @@ class _CategorySectionState extends State<CategorySection> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 110,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
-        itemBuilder: (context, index) {
-          final isSelected = selectedIndex == index;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(categories.length, (index) {
+        final isSelected = selectedIndex == index;
 
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                selectedIndex = isSelected ? -1 : index;
-              });
-              widget.onCategorySelected?.call(
-                isSelected ? null : labels[index].toLowerCase(),
-              );
-            },
-            child: Container(
-              width: 90,
-              margin: const EdgeInsets.only(right: 16),
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: index == 0 ? 0 : 4,
+              right: index == categories.length - 1 ? 0 : 4,
+            ),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  selectedIndex = isSelected ? -1 : index;
+                });
+                widget.onCategorySelected?.call(
+                  isSelected ? null : labels[index].toLowerCase(),
+                );
+              },
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    height: 70,
-                    width: 70,
+                    height: 52,
+                    width: 52,
                     decoration: BoxDecoration(
                       gradient: isSelected
                           ? const LinearGradient(
@@ -60,7 +61,7 @@ class _CategorySectionState extends State<CategorySection> {
                             )
                           : null,
                       color: isSelected ? null : Colors.white,
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(16),
                       border: isSelected
                           ? null
                           : Border.all(color: Colors.grey.shade100, width: 1.5),
@@ -68,43 +69,46 @@ class _CategorySectionState extends State<CategorySection> {
                           ? [
                               BoxShadow(
                                 color: const Color(0xFF1E3A8A).withValues(alpha: 0.25),
-                                blurRadius: 15,
-                                offset: const Offset(0, 8),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
                             ]
                           : [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.02),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                     ),
                     child: Icon(
                       categories[index],
-                      size: 28,
+                      size: 22,
                       color: isSelected
                           ? Colors.white
                           : const Color(0xFF0F172A),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   Text(
                     labels[index],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      fontSize: 13,
+                      fontSize: 11,
                       color: isSelected
                           ? const Color(0xFF0F172A)
                           : Colors.grey.shade700,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      }),
     );
   }
 }

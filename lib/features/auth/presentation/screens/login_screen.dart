@@ -72,7 +72,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   ));
 
   @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_clearInlineError);
+    _passwordController.addListener(_clearInlineError);
+  }
+
+  void _clearInlineError() {
+    if (_inlineError != null) {
+      setState(() => _inlineError = null);
+    }
+  }
+
+  @override
   void dispose() {
+    _emailController.removeListener(_clearInlineError);
+    _passwordController.removeListener(_clearInlineError);
     _emailController.dispose();
     _passwordController.dispose();
     _emailFocus.dispose();
@@ -88,7 +103,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Future<void> _login() async {
     final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+    final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
       _setError('Please enter your email and password.');

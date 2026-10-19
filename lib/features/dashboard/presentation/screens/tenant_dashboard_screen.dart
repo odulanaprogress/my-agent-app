@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../auth/presentation/providers/auth_provider.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/category_section.dart';
 import '../widgets/featured_property_section.dart';
 import '../widgets/dashboard_bottom_nav.dart';
 import '../../../../features/support/support_inquiry_screen.dart';
-import '../../../../core/services/permission_service.dart';
 import '../../../../core/services/user_behavior_service.dart';
 import '../../../../features/ai/screens/ai_chat_screen.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
@@ -217,43 +215,6 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
     ];
   }
 
-  Future<void> _confirmLogout(BuildContext context) async {
-    final bool? shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Confirm Logout', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: const Text('Are you sure you want to logout?'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Logout'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (shouldLogout == true) {
-      try {
-        await ref.read(authNotifierProvider.notifier).logout();
-      } catch (e) {
-        debugPrint('[TenantDashboard] Logout error: $e');
-      }
-      if (!context.mounted) return;
-      context.go('/login');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -292,38 +253,6 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
           ),
         ],
       ),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF0F172A)),
-            tooltip: 'Notifications',
-            onPressed: () async {
-              await PermissionService.requestNotificationPermission(context);
-              if (context.mounted) context.push('/notifications');
-            },
-          ),
-          IconButton(
-            iconSize: 20,
-            visualDensity: VisualDensity.compact,
-            onPressed: () => _showHelpSheet(),
-            icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF0F172A), size: 20),
-            tooltip: 'Help & Tour',
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12, top: 4),
-            child: IconButton(
-              iconSize: 20,
-              visualDensity: VisualDensity.compact,
-              onPressed: () => _confirmLogout(context),
-              icon: const Icon(Icons.logout_outlined, color: Colors.redAccent, size: 20),
-              tooltip: 'Logout',
-            ),
-          ),
-        ],
-      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
@@ -336,6 +265,7 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SizedBox(height: 8),
                 const DashboardHeader(),
                 const SizedBox(height: 12),
 
@@ -469,20 +399,7 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
                     });
                   },
                 ),
-                const SizedBox(height: 8),
-
-                const Padding(
-                  padding: EdgeInsets.only(left: 2),
-                  child: Text(
-                    'Featured Properties',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
 
                 // ── Quick Actions Grid ─────────────────────────────
                 Container(
@@ -591,15 +508,27 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
         color: const Color(0xFFEF4444),
         onTap: () => context.push('/search/favorites'),
       ),
+      _QuickAction(
+        icon: Icons.chat_bubble_rounded,
+        label: 'Messages',
+        color: const Color(0xFF8B5CF6),
+        onTap: () => context.push('/conversations'),
+      ),
+      _QuickAction(
+        icon: Icons.help_outline_rounded,
+        label: 'Help Guide',
+        color: const Color(0xFF64748B),
+        onTap: () => _showHelpSheet(),
+      ),
     ];
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 1.1,
-        crossAxisSpacing: 10,
+        crossAxisCount: 4,
+        childAspectRatio: 0.88,
+        crossAxisSpacing: 8,
         mainAxisSpacing: 10,
       ),
       itemCount: actions.length,
@@ -608,15 +537,16 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
         return GestureDetector(
           onTap: a.onTap,
           child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Colors.grey.shade100, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+                  color: Colors.black.withValues(alpha: 0.025),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -624,19 +554,21 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: a.color.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(a.icon, color: a.color, size: 22),
+                  child: Icon(a.icon, color: a.color, size: 18),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   a.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF0F172A),
                   ),

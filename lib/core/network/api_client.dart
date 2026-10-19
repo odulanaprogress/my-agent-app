@@ -3,8 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ApiClient {
-  /// Express backend URL (Points to Railway backend which is fully configured)
-  static const String baseUrl = 'https://my-agent-app-production-36d3.up.railway.app/api';
+  /// Express backend URL (Points to live Vercel backend)
+  static const String baseUrl = 'https://my-agent-app-backend.vercel.app/api';
 
   /// Cloudflare Workers secure API — handles AI and other calls
   static const String workersUrl = 'https://agent-api.odulanaprogress.workers.dev';
