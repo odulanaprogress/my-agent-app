@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/profile_header.dart';
 import '../widgets/settings_tile.dart';
-import '../widgets/verification_badge.dart';
 
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
@@ -63,6 +62,8 @@ class ProfileScreen extends ConsumerWidget {
                 ProfileHeader(
                   name: name.isEmpty ? 'User' : name,
                   imageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+                  role: role,
+                  isVerified: isVerified,
                   onEdit: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -70,14 +71,6 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     );
                   },
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    VerificationBadge(isVerified: isVerified),
-                    if (role.isNotEmpty) Chip(label: Text(role)),
-                  ],
                 ),
                 const SizedBox(height: 20),
 

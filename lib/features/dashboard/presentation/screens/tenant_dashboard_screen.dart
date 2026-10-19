@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../widgets/dashboard_header.dart';
 import '../widgets/category_section.dart';
+import '../widgets/promotion_banner_carousel.dart';
 import '../widgets/featured_property_section.dart';
 import '../widgets/dashboard_bottom_nav.dart';
 import '../../../../features/support/support_inquiry_screen.dart';
@@ -265,9 +266,9 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: 14),
                 const DashboardHeader(),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
                 // Search field with compact premium container styling
                 Container(
@@ -317,78 +318,8 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Premium Hero Promotion Banner Card (Compact Layout)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF1E3A8A).withValues(alpha: 0.15),
-                        blurRadius: 15,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'EXCLUSIVE OFFERS',
-                            style: TextStyle(
-                              color: Colors.amber,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.1,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text(
-                              'Verified Only',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Find Your Dream Sanctuary',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Explore premium properties with fully integrated smart features.',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.75),
-                          fontSize: 11,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // Auto-sliding 3-second promotion & updates banner
+                const PromotionBannerCarousel(),
                 const SizedBox(height: 12),
 
                 // Category section
