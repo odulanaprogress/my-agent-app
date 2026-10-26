@@ -1,0 +1,56 @@
+workflows:
+  ios-build:
+    name: iOS Build & TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      # To configure automatic App Store / TestFlight signing:
+      # 1. Add your Apple Developer account in Codemagic UI (Teams > Apple Developer Portal)
+      # 2. Uncomment the groups line below if using encrypted environment credentials:
+      # groups:
+      #   - apple_credentials
+
+    scripts:
+      - name: Set up code signing (if certificates configured)
+        script: xcode-project use-profiles
+        ignore_failure: true
+
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+
+      - name: Build Flutter iOS Release
+        script: |
+          flutter build ios --release --no-codesign
+
+      - name: Package IPA for Testing
+        script: |
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../AgentApp.ipa Payload
+
+    artifacts:
+      - AgentApp.ipa
+      - build/ios/iphoneos/Runner.app
+
+    publishing:
+      # Email notifications on build status
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          failure: true
+          success: true
+
+      # Uncomment below to publish directly to TestFlight on your iPhone:
+      # app_store_connect:
+      #   auth: integration
+      #   submit_to_testflight: true

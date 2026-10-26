@@ -1,0 +1,59 @@
+name: iOS Build & Compile Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  build-ios:
+    name: Compile Flutter iOS App
+    runs-on: macos-14 # Apple Silicon M2 runner
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Flutter & CocoaPods
+        run: |
+          flutter --version
+          pod --version
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Cache CocoaPods Pods & Specs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/.cocoapods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock', 'pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Build Flutter iOS (Compilation & Framework Assembly)
+        run: |
+          flutter build ios --release --no-codesign --verbose
+
+      - name: Compress App Bundle for Artifact Upload
+        if: success()
+        run: |
+          cd build/ios/iphoneos
+          tar -czf Runner.app.tar.gz Runner.app
+
+      - name: Upload iOS Build Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-runner-app
+          path: build/ios/iphoneos/Runner.app.tar.gz
+          retention-days: 7
