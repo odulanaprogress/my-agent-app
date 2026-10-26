@@ -19,12 +19,15 @@ workflows:
         ignore_failure: true
 
       - name: Get Flutter packages
-        script: flutter pub get
+        script: |
+          flutter precache --ios
+          flutter pub get
 
       - name: Install CocoaPods
         script: |
           cd ios
-          pod install
+          rm -rf Pods Podfile.lock
+          pod install --repo-update
 
       - name: Build Flutter iOS Release
         script: |
