@@ -33,7 +33,7 @@ jobs:
           flutter pub get
 
       - name: Cache CocoaPods Pods & Specs
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ios/Pods
