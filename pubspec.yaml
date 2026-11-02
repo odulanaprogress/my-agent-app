@@ -54,6 +54,9 @@ dependencies:
   record: ^6.2.1
   audioplayers: ^6.7.1
   path_provider: ^2.1.6
+  video_player: ^2.11.1
+  chewie: ^1.13.1
+  file_picker: ^11.0.3
 
 dev_dependencies:
   flutter_test:

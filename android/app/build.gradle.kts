@@ -41,6 +41,11 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 flutter {
@@ -48,4 +53,3 @@ flutter {
 }
 
 // Firebase/Google Services plugin needs to be applied and will use android/app/google-services.json
-

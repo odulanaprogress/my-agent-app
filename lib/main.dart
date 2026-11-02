@@ -30,7 +30,7 @@ Future<void> main() async {
         OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
       }
       OneSignal.initialize(_kOneSignalAppId);
-      OneSignal.Notifications.requestPermission(true);
+      OneSignal.Notifications.requestPermission(false);
     } catch (e) {
       debugPrint('OneSignal initialization error: $e');
     }

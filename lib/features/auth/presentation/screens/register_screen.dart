@@ -168,25 +168,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                           children: [
                             Hero(
                               tag: 'app_logo',
-                              child: Container(
-                                height: 90,
-                                width: 90,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
+                              child: Image.asset(
+                                'assets/logos/agent_logo.png',
+                                height: 80,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  height: 70,
+                                  width: 70,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF6366F1),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
-                                  borderRadius: BorderRadius.circular(28),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF0F172A).withValues(alpha: 0.25),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                  ],
+                                  child: const Icon(Icons.home_rounded, color: Colors.white, size: 36),
                                 ),
-                                child: const Icon(Icons.home_rounded, color: Colors.white, size: 45),
                               ),
                             ),
                             const SizedBox(height: 18),

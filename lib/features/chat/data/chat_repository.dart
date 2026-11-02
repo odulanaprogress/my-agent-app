@@ -282,6 +282,14 @@ class ChatRepository {
     });
   }
 
+  Future<void> deleteMessage(String conversationId, String messageId) async {
+    await conversations
+        .doc(conversationId)
+        .collection('messages')
+        .doc(messageId)
+        .delete();
+  }
+
   Future<void> toggleBlockUser(String conversationId, String uid, bool block) async {
     final docRef = conversations.doc(conversationId);
     if (block) {

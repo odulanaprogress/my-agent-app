@@ -93,9 +93,14 @@ class _FeaturedPropertySectionState extends ConsumerState<FeaturedPropertySectio
               data: (favorites) {
                 final isFavorited = favorites.contains(propertyId);
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 24),
-                  decoration: BoxDecoration(
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    context.push('/properties/details', extra: property);
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(28),
                     border: Border.all(color: Colors.grey.shade100, width: 1.5),
@@ -278,7 +283,8 @@ class _FeaturedPropertySectionState extends ConsumerState<FeaturedPropertySectio
                       ),
                     ],
                   ),
-                );
+                ),
+              );
               },
               loading: () => _buildShimmerLoader(),
               error: (err, stack) => Container(

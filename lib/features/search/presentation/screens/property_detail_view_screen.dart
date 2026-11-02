@@ -77,7 +77,11 @@ class PropertyDetailViewScreen extends StatelessWidget {
                         final query = Uri.encodeComponent(location);
                         final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
                         try {
-                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                          await launchUrl(
+                            url,
+                            mode: LaunchMode.inAppBrowserView,
+                            browserConfiguration: const BrowserConfiguration(showTitle: true),
+                          );
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

@@ -15,6 +15,8 @@ import '../../chat/presentation/screens/chat_screen.dart';
 import '../../../core/services/user_behavior_service.dart';
 import '../../notifications/repositories/notification_repository.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
+import 'package:agent_app/core/widgets/app_video_player.dart';
+import 'package:agent_app/features/calls/services/call_service.dart';
 
 
 class PropertyDetailsScreen extends ConsumerStatefulWidget {
@@ -371,7 +373,11 @@ class _PropertyDetailsScreenState
                           final query = Uri.encodeComponent('${p.address}, ${p.community}, ${p.state}');
                           final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
                           try {
-                            await launchUrl(url, mode: LaunchMode.externalApplication);
+                            await launchUrl(
+                              url,
+                              mode: LaunchMode.inAppBrowserView,
+                              browserConfiguration: const BrowserConfiguration(showTitle: true),
+                            );
                           } catch (e) {
                             _snack('Could not open map: $e');
                           }
@@ -621,48 +627,7 @@ class _PropertyDetailsScreenState
                 if (p.amenities.isNotEmpty) const SizedBox(height: 8),
 
                 // ── Video Tour ─────────────────────────────────────
-                if (p.videoUrls.isNotEmpty)
-                  _section(
-                    title: '🎬 Video Tour',
-                    child: GestureDetector(
-                      onTap: () async {
-                        final uri = Uri.parse(p.videoUrls.first);
-                        try {
-                          await launchUrl(uri,
-                              mode: LaunchMode.externalApplication);
-                        } catch (e) {
-                          _snack('Could not play video: $e');
-                        }
-                      },
-                      child: Container(
-                        height: 80,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.play_circle_fill,
-                                color: Colors.white, size: 36),
-                            SizedBox(width: 12),
-                            Text(
-                              'Watch Video Tour',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                if (p.videoUrls.isNotEmpty) const SizedBox(height: 8),
+                _buildVideoTourSection(p),
 
                 // ── Contact Landlord ───────────────────────────────
                 _section(
@@ -725,12 +690,26 @@ class _PropertyDetailsScreenState
                               onTap: _openChat,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          // Call
+                          const SizedBox(width: 8),
+                          // In-App Voice Call
+                          Expanded(
+                            child: _actionButton(
+                              icon: Icons.phone_in_talk_rounded,
+                              label: 'In-App Call',
+                              color: const Color(0xFF0F172A),
+                              onTap: () => CallService.startVoiceCall(
+                                context,
+                                receiverId: p.ownerId,
+                                receiverName: p.ownerName.isNotEmpty ? p.ownerName : 'Landlord',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Cellular Call
                           Expanded(
                             child: _actionButton(
                               icon: Icons.phone_outlined,
-                              label: 'Call',
+                              label: 'Dialer',
                               color: const Color(0xFF10B981),
                               onTap: () => _call(p.contactPhone),
                             ),
@@ -942,8 +921,151 @@ class _PropertyDetailsScreenState
   }
 
   // ── Sub-widgets ────────────────────────────────────────────────────────
+
+  Widget _buildVideoTourSection(PropertyModel p) {
+    if (p.videoUrls.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _section(
+          title: '🎬 Video Tour',
+          child: Column(
+            children: p.videoUrls.asMap().entries.map((entry) {
+              final index = entry.key + 1;
+              final videoUrl = entry.value;
+              final thumbnail = AppVideoPlayerScreen.getCloudinaryThumbnail(videoUrl);
+              final label = p.videoUrls.length > 1
+                  ? 'Watch Video Tour $index'
+                  : 'Watch In-App Video Tour';
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10.0),
+                child: GestureDetector(
+                  onTap: () {
+                    AppVideoPlayerScreen.show(
+                      context,
+                      videoUrl: videoUrl,
+                      title: '${p.title} - Tour $index',
+                    );
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      height: 140,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.25),
+                          width: 1,
+                        ),
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (thumbnail != null)
+                            Image.network(
+                              thumbnail,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                            ),
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.2),
+                                  Colors.black.withValues(alpha: 0.75),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Center(
+                            child: Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6366F1),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF6366F1).withValues(alpha: 0.45),
+                                    blurRadius: 16,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 34,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 12,
+                            left: 14,
+                            right: 14,
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.play_circle_outline_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    label,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'In-App HD',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   Widget _section({required String title, required Widget child}) {
     return Container(
+      width: double.infinity,
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       child: Column(
@@ -958,7 +1080,10 @@ class _PropertyDetailsScreenState
             ),
           ),
           const SizedBox(height: 12),
-          child,
+          SizedBox(
+            width: double.infinity,
+            child: child,
+          ),
         ],
       ),
     );

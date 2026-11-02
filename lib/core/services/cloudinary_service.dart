@@ -74,6 +74,32 @@ class CloudinaryService {
     }
   }
 
+  Future<String?> uploadRawFile(File file) async {
+    try {
+      final uri = Uri.parse(
+        'https://api.cloudinary.com/v1_1/$cloudName/raw/upload',
+      );
+
+      final request = http.MultipartRequest('POST', uri);
+      request.fields['upload_preset'] = uploadPreset;
+      request.files.add(
+        await http.MultipartFile.fromPath('file', file.path),
+      );
+
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        final responseData = await response.stream.bytesToString();
+        final decodedData = jsonDecode(responseData);
+        return decodedData['secure_url'];
+      } else {
+        return null;
+      }
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// Uploads a SENSITIVE document (government ID, selfie, proof of
   /// ownership, utility bill) for identity verification.
   ///

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,15 +8,19 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:record/record.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../providers/chat_provider.dart';
 import '../../../../core/services/cloudinary_service.dart';
 import '../../../../core/widgets/app_loader.dart';
+import '../../../../core/widgets/app_video_player.dart';
+import 'package:agent_app/features/calls/services/call_service.dart';
 import '../../../auth/presentation/providers/current_user_provider.dart';
 import '../../data/chat_repository.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:agent_app/core/widgets/app_image_viewer.dart';
+import 'package:agent_app/features/chat/presentation/widgets/audio_waveform_player.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -44,11 +49,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // Voice Recording — tap to start / tap to stop
   late final AudioRecorder _audioRecorder;
   bool _isRecording = false;
+  Timer? _recordingTimer;
+  int _recordingSeconds = 0;
 
-  // Audio Playback
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  String? _currentlyPlayingUrl;
-  bool _isPlaying = false;
+
 
   // Text state for mic/send button swap
   bool _isTextEmpty = true;
@@ -71,24 +75,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       });
     });
 
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = state == PlayerState.playing;
-          if (state == PlayerState.completed) {
-            _currentlyPlayingUrl = null;
-          }
-        });
-      }
-    });
+
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
+    _recordingTimer?.cancel();
     _audioRecorder.dispose();
-    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -99,6 +94,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         final dir = await getTemporaryDirectory();
         final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
         await _audioRecorder.start(const RecordConfig(), path: path);
+        _recordingSeconds = 0;
+        _recordingTimer?.cancel();
+        _recordingTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+          if (mounted) setState(() => _recordingSeconds++);
+        });
         setState(() {
           _isRecording = true;
         });
@@ -113,10 +113,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// Tap to STOP recording and send
   Future<void> _stopRecordingAndSend() async {
     if (!_isRecording) return;
+    _recordingTimer?.cancel();
     try {
       final path = await _audioRecorder.stop();
       setState(() {
         _isRecording = false;
+        _recordingSeconds = 0;
       });
       if (path != null) {
         await _uploadAndSendVoice(File(path));
@@ -128,10 +130,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _cancelRecording() async {
     if (!_isRecording) return;
+    _recordingTimer?.cancel();
     try {
       await _audioRecorder.stop();
       setState(() {
         _isRecording = false;
+        _recordingSeconds = 0;
       });
     } catch (_) {
       // Ignore errors when cancelling — recording may have already stopped
@@ -276,28 +280,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  Future<void> _sendMockPdf() async {
-    setState(() {
-      _isUploading = true;
-      _uploadStatus = 'Attaching document...';
-    });
-
-    await Future.delayed(const Duration(milliseconds: 500));
-
+  Future<void> _pickAndSendPdf() async {
     try {
-      final repo = ref.read(chatRepositoryProvider);
-      const pdfUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
-      await repo.sendAttachmentMessage(
-        conversationId: widget.conversationId,
-        senderId: widget.senderId,
-        receiverId: widget.receiverId,
-        fileUrl: pdfUrl,
-        fileType: 'pdf',
-        fileName: 'Tenancy_Agreement_Draft.pdf',
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
       );
-      _scrollToBottom();
+
+      if (result == null || result.files.isEmpty || result.files.single.path == null) {
+        return;
+      }
+
+      final file = File(result.files.single.path!);
+      final fileName = result.files.single.name;
+
+      setState(() {
+        _isUploading = true;
+        _uploadStatus = 'Uploading $fileName...';
+      });
+
+      final url = await CloudinaryService().uploadRawFile(file);
+
+      if (url != null) {
+        final repo = ref.read(chatRepositoryProvider);
+        await repo.sendAttachmentMessage(
+          conversationId: widget.conversationId,
+          senderId: widget.senderId,
+          receiverId: widget.receiverId,
+          fileUrl: url,
+          fileType: 'pdf',
+          fileName: fileName,
+        );
+        _scrollToBottom();
+      } else {
+        _snack('Failed to upload PDF.');
+      }
     } catch (e) {
-      _snack('Error: $e');
+      _snack('Error picking PDF: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -306,6 +325,98 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         });
       }
     }
+  }
+
+  void _confirmDeleteMessage(String messageId, String messageType) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 28),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              messageType == 'image' ? 'Delete Picture?' : 'Delete Message?',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Are you sure you want to delete this ${messageType == 'image' ? 'picture' : 'message'} from the chat?',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      try {
+                        final repo = ref.read(chatRepositoryProvider);
+                        await repo.deleteMessage(widget.conversationId, messageId);
+                        _snack('${messageType == 'image' ? 'Picture' : 'Message'} deleted');
+                      } catch (e) {
+                        _snack('Error deleting: $e');
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showAttachmentOptions() {
@@ -352,7 +463,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     label: 'PDF Doc',
                     onTap: () {
                       Navigator.pop(context);
-                      _sendMockPdf();
+                      _pickAndSendPdf();
                     },
                   ),
                 ],
@@ -472,6 +583,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final didIBlock = blockedBy.contains(widget.senderId);
 
     return [
+      IconButton(
+        icon: const Icon(Icons.call_rounded, color: Color(0xFF6366F1)),
+        tooltip: 'Voice Call',
+        onPressed: () {
+          CallService.startVoiceCall(
+            context,
+            receiverId: widget.receiverId,
+            receiverName: 'User',
+          );
+        },
+      ),
       PopupMenuButton<String>(
         onSelected: (val) async {
           if (val == 'delete') {
@@ -696,8 +818,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                   const SizedBox(width: 8),
                                 ],
                                 Flexible(
-                                  child: Container(
-                                    padding: messageType == 'text'
+                                  child: GestureDetector(
+                                    onLongPress: () => _confirmDeleteMessage(ordered[index].id, messageType),
+                                    child: Container(
+                                      padding: messageType == 'text'
                                         ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
                                         : const EdgeInsets.all(4),
                                     decoration: BoxDecoration(
@@ -751,6 +875,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     ),
                                   ),
                                 ),
+                              ),
                                 if (isMe) ...[
                                   const SizedBox(width: 8),
                                   _buildAvatar(widget.senderId, 'S', isMe: true),
@@ -832,101 +957,162 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                       ),
 
-                    // Recording indicator bar
-                    if (_isRecording)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        color: Colors.red.shade50,
-                        child: Row(
-                          children: [
-                            const Icon(Icons.fiber_manual_record, color: Colors.red, size: 14),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'Recording... Tap the stop button to send',
-                                style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: _cancelRecording,
-                              child: const Icon(Icons.delete_outline, color: Colors.red, size: 22),
-                            ),
-                          ],
-                        ),
-                      ),
-
                     SafeArea(
                       child: Container(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
                         color: Colors.white,
-                        child: Row(
-                          children: [
-                            if (!_isRecording)
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF6366F1), size: 26),
-                                onPressed: _showAttachmentOptions,
-                              ),
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                child: TextField(
-                                  controller: _controller,
-                                  maxLines: null,
-                                  enabled: !_isRecording,
-                                  decoration: InputDecoration(
-                                    hintText: _isRecording ? 'Recording audio...' : 'Type a message...',
-                                    hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-
-                            // Mic / Stop / Send button — no loading spinner for text messages
-                            _isTextEmpty
-                                ? GestureDetector(
-                                    onTap: _isRecording
-                                        ? _stopRecordingAndSend
-                                        : _startRecording,
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      width: _isRecording ? 48 : 40,
-                                      height: _isRecording ? 48 : 40,
+                        child: _isRecording
+                            ? Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: _cancelRecording,
+                                    child: Container(
+                                      width: 42,
+                                      height: 42,
                                       decoration: BoxDecoration(
-                                        color: _isRecording ? Colors.red : const Color(0xFF6366F1),
+                                        color: Colors.red.shade50,
                                         shape: BoxShape.circle,
-                                        boxShadow: _isRecording
-                                            ? [BoxShadow(color: Colors.red.withValues(alpha: 0.4), blurRadius: 12, spreadRadius: 2)]
-                                            : [],
                                       ),
-                                      child: Icon(
-                                        _isRecording ? Icons.stop_rounded : Icons.mic_none_rounded,
-                                        color: Colors.white,
-                                        size: _isRecording ? 26 : 20,
+                                      child: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Colors.redAccent,
+                                        size: 22,
                                       ),
                                     ),
-                                  )
-                                : GestureDetector(
-                                    onTap: () => _sendTextMessage(repo),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
                                     child: Container(
-                                      width: 40,
-                                      height: 40,
+                                      height: 46,
+                                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(24),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: const BoxDecoration(
+                                              color: Colors.redAccent,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                              children: List.generate(18, (i) {
+                                                final h = 6.0 + (i * 7) % 20;
+                                                return Container(
+                                                  width: 2.5,
+                                                  height: h,
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF6366F1),
+                                                    borderRadius: BorderRadius.circular(2),
+                                                  ),
+                                                );
+                                              }),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Text(
+                                            '${_recordingSeconds ~/ 60}:${(_recordingSeconds % 60).toString().padLeft(2, '0')}',
+                                            style: const TextStyle(
+                                              color: Color(0xFF0F172A),
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  GestureDetector(
+                                    onTap: _stopRecordingAndSend,
+                                    child: Container(
+                                      width: 42,
+                                      height: 42,
                                       decoration: const BoxDecoration(
                                         color: Color(0xFF6366F1),
                                         shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Color(0xFF6366F1),
+                                            blurRadius: 8,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
                                       ),
-                                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                                      child: const Icon(
+                                        Icons.arrow_upward_rounded,
+                                        color: Colors.white,
+                                        size: 22,
+                                      ),
                                     ),
                                   ),
-                          ],
-                        ),
+                                ],
+                              )
+                            : Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF6366F1), size: 26),
+                                    onPressed: _showAttachmentOptions,
+                                  ),
+                                  Expanded(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(24),
+                                      ),
+                                      child: TextField(
+                                        controller: _controller,
+                                        maxLines: null,
+                                        decoration: const InputDecoration(
+                                          hintText: 'Type a message...',
+                                          hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                                          border: InputBorder.none,
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _isTextEmpty
+                                      ? GestureDetector(
+                                          onTap: _startRecording,
+                                          child: Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.mic_none_rounded,
+                                              color: Color(0xFF6366F1),
+                                              size: 20,
+                                            ),
+                                          ),
+                                        )
+                                      : GestureDetector(
+                                          onTap: () => _sendTextMessage(repo),
+                                          child: Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF6366F1),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                                          ),
+                                        ),
+                                ],
+                              ),
                       ),
-                    ),
+                    )
                   ],
                 ),
             ],
@@ -953,10 +1139,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
-          onTap: () async {
+          onTap: () {
             if (fileUrl.isNotEmpty) {
-              final uri = Uri.parse(fileUrl);
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
+              AppImageViewer.show(context, imageUrl: fileUrl);
             }
           },
           child: Container(
@@ -983,27 +1168,82 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
       );
     } else if (type == 'video') {
+      final thumbnail = AppVideoPlayerScreen.getCloudinaryThumbnail(fileUrl);
       return ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
-          onTap: () async {
+          onTap: () {
             if (fileUrl.isNotEmpty) {
-              final uri = Uri.parse(fileUrl);
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
+              AppVideoPlayerScreen.show(
+                context,
+                videoUrl: fileUrl,
+                title: 'Video Attachment',
+              );
             }
           },
           child: Container(
             width: 200,
             height: 130,
-            color: Colors.black87,
-            child: const Stack(
+            color: const Color(0xFF0F172A),
+            child: Stack(
+              fit: StackFit.expand,
               alignment: Alignment.center,
               children: [
-                Icon(Icons.video_library_rounded, color: Colors.white54, size: 42),
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  radius: 20,
-                  child: Icon(Icons.play_arrow_rounded, color: Colors.black87),
+                if (thumbnail != null)
+                  Image.network(
+                    thumbnail,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                  ),
+                Container(
+                  color: Colors.black.withValues(alpha: 0.35),
+                ),
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Color(0xFF6366F1),
+                      size: 28,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.play_circle_fill, color: Colors.white, size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          'Play in app',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1015,7 +1255,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         onTap: () async {
           if (fileUrl.isNotEmpty) {
             final uri = Uri.parse(fileUrl);
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            await launchUrl(
+              uri,
+              mode: LaunchMode.inAppBrowserView,
+              browserConfiguration: const BrowserConfiguration(showTitle: true),
+            );
           }
         },
         child: Container(
@@ -1055,55 +1299,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
       );
     } else if (type == 'audio') {
-      final isPlaying = _currentlyPlayingUrl == fileUrl && _isPlaying;
-      return Container(
-        width: 200,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: isMe ? Colors.white : const Color(0xFF6366F1),
-              radius: 18,
-              child: IconButton(
-                icon: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: isMe ? const Color(0xFF6366F1) : Colors.white, size: 20),
-                onPressed: () async {
-                  if (isPlaying) {
-                    await _audioPlayer.pause();
-                  } else {
-                    await _audioPlayer.play(UrlSource(fileUrl));
-                    setState(() {
-                      _currentlyPlayingUrl = fileUrl;
-                    });
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Container(
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isMe ? Colors.white.withValues(alpha: 0.3) : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: isPlaying ? 0.5 : 0.0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isMe ? Colors.white : const Color(0xFF6366F1),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text('Audio', style: TextStyle(color: isMe ? Colors.white70 : Colors.grey.shade600, fontSize: 10)),
-          ],
-        ),
-      );
-    } else {
+      return AudioWaveformPlayer(audioUrl: fileUrl, isMe: isMe);
+        } else {
       return Text(text, style: textStyle);
     }
   }

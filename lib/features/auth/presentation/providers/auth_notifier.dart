@@ -162,7 +162,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (!kIsWeb) {
         Future.microtask(() async {
           try {
-            final granted = await OneSignal.Notifications.requestPermission(true);
+            final granted = await OneSignal.Notifications.requestPermission(false);
             if (granted) {
               await OneSignalApiService.sendNotification(
                 receiverUids: [user.uid],
