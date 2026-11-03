@@ -163,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       tag: 'app_logo',
                       child: Image.asset(
                         'assets/logos/agent_logo.png',
-                        height: 54,
+                        height: 60,
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Container(
                           height: 70,
@@ -198,7 +198,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               // Form card with shake
               AnimatedBuilder(
