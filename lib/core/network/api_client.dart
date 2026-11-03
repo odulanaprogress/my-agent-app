@@ -3,14 +3,14 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ApiClient {
-  /// Express backend URL (Points to live Vercel backend)
-  static const String baseUrl = 'https://my-agent-app-backend.vercel.app/api';
+  /// Primary REST API (Points to live Vercel backend via custom domain)
+  static const String baseUrl = 'https://api.agentmobiletech.com/api';
 
-  /// Cloudflare Workers secure API — handles AI and other calls
-  static const String workersUrl = 'https://agent-api.odulanaprogress.workers.dev';
+  /// Cloudflare Workers secure API — handles bank resolution, virtual accounts, and edge operations
+  static const String workersUrl = 'https://edge.agentmobiletech.com';
 
-  /// Railway backend — static IP whitelisted on Flutterwave, handles all withdrawals
-  static const String railwayUrl = 'https://my-agent-app-production-36d3.up.railway.app/api';
+  /// Payouts backend (routed through primary backend with verified Flutterwave disbursement)
+  static const String railwayUrl = 'https://api.agentmobiletech.com/api';
 
   static Future<Map<String, String>> _getHeaders() async {
     final user = FirebaseAuth.instance.currentUser;

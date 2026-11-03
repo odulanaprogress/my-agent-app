@@ -75,11 +75,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final userEmail = user.email?.trim().toLowerCase() ?? '';
 
       // Auto-assign roles for system emails
-      if (userEmail == 'agentadminsupport@gmail.com') {
+      if (userEmail == 'agentadminsupport@gmail.com' || userEmail == 'admin@agentmobiletech.com' || userEmail == 'progressodulana@agentmobiletech.com') {
         if (profile == null) {
           final adminProfile = UserModel(
             uid: user.uid,
-            email: 'agentadminsupport@gmail.com',
+            email: userEmail,
             fullName: user.displayName ?? 'Platform Admin',
             role: 'admin',
             isVerified: true,
@@ -134,7 +134,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           uid: user.uid,
           email: user.email ?? '',
           fullName: user.displayName ?? (user.email != null && user.email!.contains('@') ? user.email!.split('@').first : 'User'),
-          role: (userEmail == 'agentadminsupport@gmail.com') ? 'admin' : 'tenant',
+          role: (userEmail == 'agentadminsupport@gmail.com' || userEmail == 'admin@agentmobiletech.com' || userEmail == 'progressodulana@agentmobiletech.com') ? 'admin' : 'tenant',
           isVerified: user.emailVerified,
           privacyAccepted: true,
           onboardingCompleted: false,

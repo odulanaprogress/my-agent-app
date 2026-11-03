@@ -25,6 +25,9 @@ const _defaultOrigins = [
   'http://localhost:5000',
   'https://my-agent-app-teal.vercel.app',
   'https://my-agent-app-backend.vercel.app',
+  'https://agentmobiletech.com',
+  'https://www.agentmobiletech.com',
+  'https://api.agentmobiletech.com',
 ];
 const allowedOrigins = [
   ..._defaultOrigins,

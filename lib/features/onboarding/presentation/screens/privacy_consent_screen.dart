@@ -311,8 +311,8 @@ class _PrivacyConsentScreenState
                     title: '12. Contact Us',
                     body:
                         'For privacy inquiries, data requests, or complaints:\n\n'
-                        '📧 DPO Email: dpo@agentplatform.ng\n'
-                        '📧 Support: support@agentplatform.ng\n'
+                        '📧 DPO Email: admin@agentmobiletech.com\n'
+                        '📧 Support: customercare@agentmobiletech.com\n'
                         '🏢 Agent Platform Ltd, Lagos, Nigeria\n\n'
                         'If you are dissatisfied with our response, you may lodge a complaint with the National Information Technology Development Agency (NITDA) — Nigeria\'s data protection authority — at www.nitda.gov.ng.',
                   ),

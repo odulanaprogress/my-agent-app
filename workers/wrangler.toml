@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 # Non-secret config — safe to put here
 FIREBASE_PROJECT_ID = "agent-app-67bc4"
-ALLOWED_ORIGIN = "https://my-agent-app-teal.vercel.app"
+ALLOWED_ORIGIN = "https://agentmobiletech.com"
 
 # For local development with wrangler dev:
 # Copy .dev.vars.example to .dev.vars and fill in values

@@ -37,11 +37,19 @@ export default {
       'Access-Control-Max-Age': '86400',
     };
 
-    // Only allow requests from the configured origin
+    const allowedOrigins = [
+      allowedOrigin,
+      'https://agentmobiletech.com',
+      'https://www.agentmobiletech.com',
+      'https://my-agent-app-teal.vercel.app',
+      'http://localhost:3000',
+    ].filter(Boolean);
+
+    // Only allow requests from the configured origins
     // Allow null origin for mobile app requests (no Origin header on native apps)
-    const isAllowedOrigin = !origin || origin === allowedOrigin;
+    const isAllowedOrigin = !origin || allowedOrigins.includes(origin);
     if (isAllowedOrigin) {
-      corsHeaders['Access-Control-Allow-Origin'] = origin || allowedOrigin;
+      corsHeaders['Access-Control-Allow-Origin'] = origin || allowedOrigin || '*';
     }
 
     // Handle CORS preflight
