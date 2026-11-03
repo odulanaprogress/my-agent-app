@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../data/notification_repository.dart';
 import '../providers/notification_provider.dart';
@@ -9,11 +12,37 @@ import '../widgets/empty_notifications_widget.dart';
 import '../widgets/notification_tile.dart';
 import '../../../../core/widgets/skeleton_loader.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  bool _notificationsAllowed = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPermission();
+  }
+
+  Future<void> _checkPermission() async {
+    if (!kIsWeb) {
+      try {
+        final allowed = OneSignal.Notifications.permission;
+        if (mounted) {
+          setState(() {
+            _notificationsAllowed = allowed;
+          });
+        }
+      } catch (_) {}
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final repo = ref.read(notificationRepositoryProvider);
 
@@ -36,42 +65,133 @@ class NotificationsScreen extends ConsumerWidget {
               )
             : null,
       ),
-      body: StreamBuilder<List<NotificationItem>>(
-        stream: repo.watchUserNotifications(uid: uid, limit: 20),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: 6,
-              itemBuilder: (_, __) => const SkeletonListTile(),
-            );
-          }
+      body: Column(
+        children: [
+          if (!_notificationsAllowed)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.notifications_off_outlined,
+                      color: Color(0xFFD97706), size: 22),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Device push notifications are disabled in settings.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF92400E),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      await openAppSettings();
+                      await _checkPermission();
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Enable',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: StreamBuilder<List<NotificationItem>>(
+              stream: repo.watchUserNotifications(uid: uid, limit: 30),
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: 6,
+                    itemBuilder: (context, index) => const SkeletonListTile(),
+                  );
+                }
 
-          final items = snap.data ?? [];
+                if (snap.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline_rounded,
+                              size: 48, color: Colors.redAccent),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Unable to load notifications',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${snap.error}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () => setState(() {}),
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Try Again'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F172A),
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
 
-          if (items.isEmpty) {
-            return const EmptyNotificationsWidget();
-          }
+                final items = snap.data ?? [];
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return NotificationTile(
-                item: item,
-                onTap: () async {
-                  if (!item.isRead) {
-                    await repo.markAsRead(uid: uid, notificationId: item.id);
-                  }
+                if (items.isEmpty) {
+                  return const EmptyNotificationsWidget();
+                }
 
-                  if (!context.mounted) return;
-                  _showNotificationDetailModal(context, item);
-                },
-              );
-            },
-          );
-        },
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return NotificationTile(
+                      item: item,
+                      onTap: () async {
+                        if (!item.isRead) {
+                          await repo.markAsRead(uid: uid, notificationId: item.id);
+                        }
+
+                        if (!context.mounted) return;
+                        _showNotificationDetailModal(context, item);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -111,7 +231,8 @@ class NotificationsScreen extends ConsumerWidget {
                       color: const Color(0xFF0F172A).withValues(alpha: 0.08),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.notifications_active_rounded, color: Color(0xFF0F172A), size: 24),
+                    child: const Icon(Icons.notifications_active_rounded,
+                        color: Color(0xFF0F172A), size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -120,7 +241,10 @@ class NotificationsScreen extends ConsumerWidget {
                       children: [
                         Text(
                           item.title,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A)),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -154,7 +278,7 @@ class NotificationsScreen extends ConsumerWidget {
                   },
                   icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
                   label: const Text(
-                    'Open Transaction Details ➔',
+                    'Open Details ➔',
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(

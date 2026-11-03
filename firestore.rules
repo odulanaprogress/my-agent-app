@@ -171,13 +171,44 @@ service cloud.firestore {
     // Notifications
     // ──────────────────────────────────────────
     match /notifications/{notificationId} {
-      // Users can only read their own notifications
-      allow read: if signedIn() &&
-        request.auth.uid == resource.data.userId;
-      // Authenticated users can create notifications for recipients (chat, payments, system)
+      // Users can only read their own notifications (supports both userId and uid fields)
+      allow read: if signedIn() && (
+        resource == null ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.uid == request.auth.uid ||
+        isAdmin()
+      );
+      // Authenticated users can create notifications for recipients (chat, calls, payments, system)
       allow create: if signedIn();
-      allow update, delete: if signedIn() &&
-        (request.auth.uid == resource.data.userId || isAdmin());
+      allow update, delete: if signedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.uid == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ──────────────────────────────────────────
+    // In-App Calls (VoIP Signaling)
+    // ──────────────────────────────────────────
+    match /calls/{callId} {
+      allow read: if signedIn() && (
+        resource == null ||
+        request.auth.uid == resource.data.callerId ||
+        request.auth.uid == resource.data.receiverId ||
+        isAdmin()
+      );
+      allow create: if signedIn() &&
+        request.resource.data.callerId == request.auth.uid;
+      allow update: if signedIn() && (
+        request.auth.uid == resource.data.callerId ||
+        request.auth.uid == resource.data.receiverId ||
+        isAdmin()
+      );
+      allow delete: if signedIn() && (
+        request.auth.uid == resource.data.callerId ||
+        request.auth.uid == resource.data.receiverId ||
+        isAdmin()
+      );
     }
 
     // ──────────────────────────────────────────

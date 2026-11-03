@@ -1,6 +1,6 @@
+import 'package:agent_app/core/widgets/app_map_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class PropertyDetailViewScreen extends StatelessWidget {
   final Map<String, dynamic> propertyData;
@@ -73,22 +73,12 @@ class PropertyDetailViewScreen extends StatelessWidget {
 
                     // Location
                     InkWell(
-                      onTap: () async {
-                        final query = Uri.encodeComponent(location);
-                        final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
-                        try {
-                          await launchUrl(
-                            url,
-                            mode: LaunchMode.inAppBrowserView,
-                            browserConfiguration: const BrowserConfiguration(showTitle: true),
-                          );
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Could not open map: $e')),
-                            );
-                          }
-                        }
+                      onTap: () {
+                        AppMapScreen.show(
+                          context,
+                          locationQuery: location,
+                          title: title,
+                        );
                       },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(

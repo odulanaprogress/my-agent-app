@@ -1,3 +1,4 @@
+import 'package:agent_app/core/widgets/app_map_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -368,19 +369,13 @@ class _PropertyDetailsScreenState
                       ),
                       const SizedBox(height: 8),
                       InkWell(
-                        onTap: () async {
-                          await PermissionService.requestLocationPermission(context);
-                          final query = Uri.encodeComponent('${p.address}, ${p.community}, ${p.state}');
-                          final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
-                          try {
-                            await launchUrl(
-                              url,
-                              mode: LaunchMode.inAppBrowserView,
-                              browserConfiguration: const BrowserConfiguration(showTitle: true),
-                            );
-                          } catch (e) {
-                            _snack('Could not open map: $e');
-                          }
+                        onTap: () {
+                          final fullAddress = '${p.address}, ${p.community}, ${p.state}';
+                          AppMapScreen.show(
+                            context,
+                            locationQuery: fullAddress,
+                            title: p.title,
+                          );
                         },
                         borderRadius: BorderRadius.circular(16),
                         child: Container(

@@ -1,3 +1,4 @@
+import 'package:agent_app/features/calls/services/call_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (user == null) {
         _ref.read(currentUserProvider.notifier).state = null;
         state = state.copyWith(status: AuthStatus.unauthenticated);
+        CallService.stopListening();
         if (!kIsWeb) {
           try { OneSignal.logout(); } catch (_) {}
         }
@@ -46,6 +48,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       // Link this device to the user's Firebase UID so OneSignal can target them
+      CallService.listenForIncomingCalls();
       if (!kIsWeb) {
         try { OneSignal.login(user.uid); } catch (_) {}
       }

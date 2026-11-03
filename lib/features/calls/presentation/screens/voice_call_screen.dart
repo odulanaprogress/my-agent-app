@@ -33,6 +33,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   CallStatus _status = CallStatus.calling;
 
   Timer? _durationTimer;
+  Timer? _ringTimeoutTimer;
   int _callDurationSeconds = 0;
   bool _isMuted = false;
   bool _isSpeaker = false;
@@ -54,11 +55,20 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
     _listenToCallUpdates();
 
-    // Auto simulate connect for outbound calls after 3 seconds if demoing or peer connects
+    // Outbound call timeout: Wait up to 45 seconds for receiver to answer
     if (!widget.isIncoming) {
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted && _status == CallStatus.calling) {
-          CallService.markCallConnected(widget.callId);
+      _ringTimeoutTimer = Timer(const Duration(seconds: 45), () {
+        if (mounted && (_status == CallStatus.calling || _status == CallStatus.ringing)) {
+          CallService.endCall(widget.callId);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No answer'),
+                backgroundColor: Color(0xFF1E293B),
+              ),
+            );
+            Navigator.of(context).pop();
+          }
         }
       });
     }
@@ -81,8 +91,11 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
           _status = call.status;
         });
 
-        if (call.status == CallStatus.connected && _durationTimer == null) {
-          _startDurationTimer();
+        if (call.status == CallStatus.connected) {
+          _ringTimeoutTimer?.cancel();
+          if (_durationTimer == null) {
+            _startDurationTimer();
+          }
         } else if (call.status == CallStatus.ended ||
             call.status == CallStatus.declined) {
           _endAndClose();
@@ -142,6 +155,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   void dispose() {
     _pulseController.dispose();
     _durationTimer?.cancel();
+    _ringTimeoutTimer?.cancel();
     _callSub?.cancel();
     super.dispose();
   }

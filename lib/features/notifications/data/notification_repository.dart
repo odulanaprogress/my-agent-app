@@ -54,7 +54,8 @@ class NotificationRepository {
     required String type,
     required String targetId,
   }) async {
-    await _notificationsCollection.add({
+    final docRef = _notificationsCollection.doc();
+    await docRef.set({
       'userId': uid,
       'title': title,
       'message': message,
@@ -64,6 +65,23 @@ class NotificationRepository {
       'targetId': targetId,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Compatibility alias for any component calling createNotification
+  Future<void> createNotification({
+    required String userId,
+    required String title,
+    required String body,
+    String type = 'system',
+    String targetId = '',
+  }) async {
+    await addNotification(
+      uid: userId,
+      title: title,
+      message: body,
+      type: type,
+      targetId: targetId,
+    );
   }
 }
 
@@ -95,6 +113,9 @@ class NotificationItem {
     }
     if (value is DateTime) {
       return value;
+    }
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
     }
     return DateTime.now();
   }

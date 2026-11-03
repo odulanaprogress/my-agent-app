@@ -51,6 +51,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _isRecording = false;
   Timer? _recordingTimer;
   int _recordingSeconds = 0;
+  StreamSubscription<Amplitude>? _amplitudeSub;
+  List<double> _waveformHeights = List.filled(18, 6.0);
 
 
 
@@ -83,6 +85,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _controller.dispose();
     _scrollController.dispose();
     _recordingTimer?.cancel();
+    _amplitudeSub?.cancel();
     _audioRecorder.dispose();
     super.dispose();
   }
@@ -98,6 +101,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _recordingTimer?.cancel();
         _recordingTimer = Timer.periodic(const Duration(seconds: 1), (t) {
           if (mounted) setState(() => _recordingSeconds++);
+        });
+        _waveformHeights = List.filled(18, 6.0);
+        _amplitudeSub?.cancel();
+        _amplitudeSub = _audioRecorder
+            .onAmplitudeChanged(const Duration(milliseconds: 100))
+            .listen((amp) {
+          if (mounted) {
+            final currentDb = amp.current.clamp(-50.0, 0.0);
+            final factor = (currentDb + 50.0) / 50.0;
+            final h = 5.0 + (factor * 22.0);
+            setState(() {
+              _waveformHeights.removeAt(0);
+              _waveformHeights.add(h);
+            });
+          }
         });
         setState(() {
           _isRecording = true;
@@ -116,9 +134,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _recordingTimer?.cancel();
     try {
       final path = await _audioRecorder.stop();
+      _amplitudeSub?.cancel();
+      _amplitudeSub = null;
       setState(() {
         _isRecording = false;
         _recordingSeconds = 0;
+        _waveformHeights = List.filled(18, 6.0);
       });
       if (path != null) {
         await _uploadAndSendVoice(File(path));
@@ -133,9 +154,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _recordingTimer?.cancel();
     try {
       await _audioRecorder.stop();
+      _amplitudeSub?.cancel();
+      _amplitudeSub = null;
       setState(() {
         _isRecording = false;
         _recordingSeconds = 0;
+        _waveformHeights = List.filled(18, 6.0);
       });
     } catch (_) {
       // Ignore errors when cancelling — recording may have already stopped

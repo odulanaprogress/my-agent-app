@@ -156,11 +156,14 @@ class _AuthChangeNotifier extends ChangeNotifier {
 
 // ── Router provider ───────────────────────────────────────────────────────────
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final routerProvider = Provider<GoRouter>((ref) {
   final authNotifier = _AuthChangeNotifier();
   ref.onDispose(authNotifier.dispose);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/auth-splash',
     refreshListenable: authNotifier,
     redirect: (context, state) {

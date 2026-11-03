@@ -149,11 +149,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 10),
 
               // Logo + brand
               Center(
@@ -163,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       tag: 'app_logo',
                       child: Image.asset(
                         'assets/logos/agent_logo.png',
-                        height: 80,
+                        height: 54,
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Container(
                           height: 70,
@@ -176,29 +176,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     const Text(
                       'Beyond Housing',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF64748B),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF334155),
                         letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 3),
                     Text(
                       'Welcome back — let\'s find your dream property',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.grey.shade600,
-                        fontSize: 13,
+                        fontSize: 12.5,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 16),
 
               // Form card with shake
               AnimatedBuilder(
@@ -216,7 +216,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(30),
@@ -284,7 +284,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         hasError: _inlineError != null,
                         onSubmitted: (_) => _passwordFocus.requestFocus(),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       // ── Password field ───────────────────────────
                       _buildField(
@@ -313,25 +313,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         child: TextButton(
                           onPressed: () => context.push('/forgot-password'),
                           style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           child: Text(
                             'Forgot password?',
                             style: TextStyle(
                               color: AppColors.primary,
-                              fontSize: 13,
+                              fontSize: 12.5,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
 
                       // ── Login button ─────────────────────────────
                       SizedBox(
                         width: double.infinity,
-                        height: 58,
+                        height: 50,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
@@ -363,7 +364,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 14),
 
                       // Divider
                       Row(
@@ -372,18 +373,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               child: Divider(color: Colors.grey.shade200)),
                           Padding(
                             padding:
-                                const EdgeInsets.symmetric(horizontal: 12),
+                                const EdgeInsets.symmetric(horizontal: 10),
                             child: Text(
                               'OR',
                               style: TextStyle(
-                                  color: Colors.grey.shade400, fontSize: 12),
+                                  color: Colors.grey.shade400, fontSize: 11),
                             ),
                           ),
                           Expanded(
                               child: Divider(color: Colors.grey.shade200)),
                         ],
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
 
                       // ── Google ───────────────────────────────────
                       _socialBtn(
@@ -408,7 +409,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           }
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
 
                       // ── Biometrics (Mobile Only) ───────────────────
                       if (!kIsWeb) ...[
@@ -418,9 +419,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           iconColor: const Color(0xFF6366F1),
                           onTap: () => context.push('/fingerprint'),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                       ],
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
 
                       // ── Sign up link ─────────────────────────────
                       Row(
@@ -443,7 +444,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -482,8 +483,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         fillColor: hasError
             ? const Color(0xFFFEF2F2)
             : const Color(0xFFF8FAFC),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
@@ -514,7 +516,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }) {
     return SizedBox(
       width: double.infinity,
-      height: 54,
+      height: 48,
       child: OutlinedButton(
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: Colors.grey.shade200),
@@ -550,7 +552,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }) {
     return SizedBox(
       width: double.infinity,
-      height: 54,
+      height: 48,
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: Colors.grey.shade200),
