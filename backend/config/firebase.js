@@ -4,15 +4,13 @@ const fs = require('fs');
 
 function parseServiceAccount(rawInput) {
   if (!rawInput) return null;
-  let raw = rawInput.trim();
-  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
-    try {
-      raw = JSON.parse(raw);
-    } catch (_) {
-      raw = raw.slice(1, -1);
-    }
+  let s = String(rawInput).trim();
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    s = s.substring(start, end + 1);
   }
-  const sa = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const sa = JSON.parse(s);
   if (sa && sa.private_key && typeof sa.private_key === 'string') {
     sa.private_key = sa.private_key.replace(/\\n/g, '\n');
   }
@@ -62,4 +60,4 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-module.exports = { admin, db };
+module.exports = { admin, db, parseServiceAccount };

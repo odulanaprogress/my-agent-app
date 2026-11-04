@@ -80,21 +80,20 @@ const pinRateLimiter = rateLimit({
 });
 
 // ── Health check ─────────────────────────────────────────────────────────────
+const { parseServiceAccount } = require('./config/firebase');
+
 app.get('/api/health', (req, res) => {
   let envStatus = 'missing';
   let parseError = null;
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
   if (raw) {
-    envStatus = 'present (len: ' + raw.length + ')';
     try {
-      let cleaned = raw.trim();
-      if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
-        cleaned = cleaned.slice(1, -1);
-      }
-      const parsed = typeof cleaned === 'string' ? JSON.parse(cleaned) : cleaned;
-      if (parsed.private_key) {
+      const parsed = parseServiceAccount(raw);
+      if (parsed && parsed.private_key) {
         envStatus = 'valid (client_email: ' + parsed.client_email + ')';
+      } else {
+        envStatus = 'invalid_format';
       }
     } catch (e) {
       parseError = e.message;
