@@ -148,7 +148,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 450),
+            child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,6 +452,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
         ),
       ),
+    ),
+    ),
     );
   }
 
