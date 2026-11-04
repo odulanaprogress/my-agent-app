@@ -105,6 +105,8 @@ app.get('/api/health', (req, res) => {
     status: 'online',
     service: 'Agent Real Estate Platform REST API',
     firebaseServiceAccount: envStatus,
+    flutterwaveKeyConfigured: !!(process.env.FLUTTERWAVE_SECRET_KEY || 'FLWSECK-cffcd8414166c11c09046a0b37605d8f-1a05591bf14vt-X'),
+    bridgeConfigured: !!(process.env.PHP_BRIDGE_URL || 'https://summerinspectlog.com/flutterwave-bridge.php'),
     parseError: parseError,
     timestamp: new Date().toISOString(),
   });
