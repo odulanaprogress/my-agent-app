@@ -1,8 +1,14 @@
 const axios = require('axios');
 
+// Active, verified Flutterwave production secret key
+const VERIFIED_SECRET_KEY = 'FLWSECK-cffcd8414166c11c09046a0b37605d8f-1a05591bf14vt-X';
+
+const envKey = (process.env.FLUTTERWAVE_SECRET_KEY || '').trim();
+// Ignore expired/stale keys that begin with FLWSECK-af
 const secretKey =
-  process.env.FLUTTERWAVE_SECRET_KEY ||
-  'FLWSECK-cffcd8414166c11c09046a0b37605d8f-1a05591bf14vt-X';
+  envKey && !envKey.startsWith('FLWSECK-af')
+    ? envKey
+    : VERIFIED_SECRET_KEY;
 
 const bridgeUrl =
   process.env.PHP_BRIDGE_URL ||

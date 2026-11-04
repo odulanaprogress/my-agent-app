@@ -104,15 +104,17 @@ app.get('/api/health', (req, res) => {
   const flwRaw = process.env.FLUTTERWAVE_SECRET_KEY || '';
   const flwPrefix = flwRaw ? flwRaw.slice(0, 10) + '...' + flwRaw.slice(-4) : 'not_set';
   const flwLen = flwRaw.length;
+  const activeFlwKey = (flwRaw && !flwRaw.startsWith('FLWSECK-af')) ? flwRaw : 'FLWSECK-cffcd8414166c11c09046a0b37605d8f-1a05591bf14vt-X';
 
   res.status(200).json({
     status: 'online',
     service: 'Agent Real Estate Platform REST API',
     firebaseServiceAccount: envStatus,
+    activeFlwKeyPrefix: activeFlwKey.slice(0, 10) + '...' + activeFlwKey.slice(-4),
     flwKeyInEnv: flwPrefix,
     flwKeyLength: flwLen,
-    bridgeUrlInEnv: process.env.PHP_BRIDGE_URL || 'not_set',
-    bridgeTokenInEnv: process.env.PHP_BRIDGE_TOKEN ? 'set' : 'not_set',
+    bridgeUrlInEnv: process.env.PHP_BRIDGE_URL || 'default_bridge',
+    bridgeTokenInEnv: process.env.PHP_BRIDGE_TOKEN ? 'set' : 'default_token',
     parseError: parseError,
     timestamp: new Date().toISOString(),
   });
