@@ -17,6 +17,7 @@ import '../../../../../core/services/onesignal_api_service.dart';
 import 'current_user_provider.dart';
 import 'package:agent_app/core/storage/secure_storage_service.dart';
 import 'package:agent_app/core/storage/user_cache_service.dart';
+import 'package:agent_app/core/network/api_client.dart';
 import '../../../../../core/services/security_alert_service.dart';
 
 class AuthNotifier extends StateNotifier<AuthState> {
@@ -144,6 +145,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
         profile = autoProfile;
         try {
           await _userFirestoreService.createUserProfile(autoProfile);
+          // Dispatch welcome email and admin alert for first-time Google sign-in
+          Future.microtask(() async {
+            try {
+              await ApiClient.post('/notify/welcome', {
+                'fullName': autoProfile.fullName,
+                'role': autoProfile.role,
+                'email': autoProfile.email,
+              });
+            } catch (e) {
+              debugPrint('Welcome email dispatch error on Google Sign-in: $e');
+            }
+          });
         } catch (e) {
           debugPrint('[AuthNotifier] Failed to persist profile to Firestore: $e');
         }
@@ -202,6 +215,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Flag so the dashboard can prompt fingerprint registration on first login
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('just_logged_in', true);
+
+      // Dispatch login security alert email
+      Future.microtask(() async {
+        try {
+          await ApiClient.post('/notify/login-alert', {
+            'device': kIsWeb ? 'Web Browser' : 'Mobile App',
+            'email': email,
+          });
+        } catch (e) {
+          debugPrint('Login alert email dispatch error: $e');
+        }
+      });
     } on FirebaseAuthException catch (e) {
       _failedLoginAttempts++;
       if (_failedLoginAttempts >= 3) {
@@ -248,6 +273,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
           debugPrint('SecureStorage write error: $e');
         }
       }
+
+      // Dispatch branded Welcome email to user and alert Admin team
+      Future.microtask(() async {
+        try {
+          await ApiClient.post('/notify/welcome', {
+            'fullName': fullName,
+            'role': role,
+            'email': email,
+          });
+        } catch (e) {
+          debugPrint('Welcome email dispatch error: $e');
+        }
+      });
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
     } catch (e) {
@@ -283,6 +321,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       state = state.copyWith(status: AuthStatus.loading);
       await _authService.signInWithGoogle();
+
+      // Dispatch login security alert email
+      Future.microtask(() async {
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            await ApiClient.post('/notify/login-alert', {
+              'device': kIsWeb ? 'Web Browser (Google Sign-In)' : 'Mobile App (Google Sign-In)',
+              'email': user.email,
+              'name': user.displayName,
+            });
+          }
+        } catch (e) {
+          debugPrint('Google login alert email dispatch error: $e');
+        }
+      });
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.message);
     } catch (e) {

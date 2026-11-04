@@ -1,5 +1,6 @@
 const { db, admin } = require('../config/firebase');
 const flutterwaveService = require('../services/flutterwaveService');
+const emailService = require('../services/emailService');
 
 /**
  * Initialize payment reference
@@ -153,6 +154,29 @@ const verifyPaymentByRef = async (req, res, next) => {
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               }, { merge: true });
             });
+
+            // Dispatch confirmation email to depositor & alert billing team
+            try {
+              let userEmail = flwTx.customer?.email;
+              let userName = flwTx.customer?.name;
+              if (!userEmail && userId) {
+                const uDoc = await db.collection('users').doc(userId).get();
+                if (uDoc.exists) {
+                  userEmail = uDoc.data()?.email;
+                  userName = uDoc.data()?.fullName || uDoc.data()?.name;
+                }
+              }
+              if (userEmail) {
+                emailService.sendPaymentReceivedEmail({
+                  to: userEmail,
+                  name: userName || 'Valued User',
+                  amount: amountPaid,
+                  txRef: refToQuery,
+                  type: 'Wallet Deposit',
+                  date: new Date().toUTCString(),
+                }).catch(err => console.error('Deposit confirmation email error:', err.message));
+              }
+            } catch (_) {}
           }
           return res.status(200).json({
             verified: true,
@@ -331,6 +355,24 @@ const requestWithdrawal = async (req, res, next) => {
         payoutStatus: payoutRes?.status || 'QUEUED',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // Alert Billing / Management of withdrawal initiation
+      try {
+        emailService.sendAdminAlert({
+          subject: `⚠️ Withdrawal Initiated: ₦${Math.round(amount).toLocaleString()} — Ref: ${reference}`,
+          title: 'New Bank Withdrawal Dispatched',
+          details: {
+            'User ID': uid,
+            'Amount': `₦${Math.round(amount).toLocaleString()}`,
+            'Bank Code': bankCode.trim(),
+            'Account Number': accountNumber.trim(),
+            'Transaction Ref': reference,
+            'Payout Status': payoutRes?.status || 'QUEUED',
+            'Initiated At': new Date().toUTCString(),
+          },
+          recipients: emailService.BILLING_EMAILS,
+        }).catch(err => console.error('Withdrawal admin alert error:', err.message));
+      } catch (_) {}
     } catch (payoutErr) {
       // Payout failed — refund the reserved balance and mark transaction as failed
       if (reserved) {

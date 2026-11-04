@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:agent_app/core/services/onesignal_api_service.dart';
+import 'package:agent_app/core/network/api_client.dart';
 class UserBehaviorService {
   static final FirebaseFirestore _fs = FirebaseFirestore.instance;
   static const _collection = 'user_behavior_logs';
@@ -75,6 +76,14 @@ class UserBehaviorService {
       await _fs.collection('properties').doc(propertyId).update({'inquiriesCount': FieldValue.increment(1)});
     } catch (_) {}
     await _notifyLandlord(propertyId, title, 'Someone inquired about your property');
+
+    // Trigger branded email to landlord & alert Customer Care/Admin
+    try {
+      await ApiClient.post('/notify/enquiry', {
+        'propertyId': propertyId,
+        'propertyTitle': title,
+      });
+    } catch (_) {}
   }
 
   static Future<void> logPropertySave(String propertyId, String title, bool isSaved) async {

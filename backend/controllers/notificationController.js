@@ -1,5 +1,6 @@
 const { db } = require('../config/firebase');
 const { sendPushNotification } = require('../services/onesignalService');
+const emailService = require('../services/emailService');
 
 /**
  * Helper to save in-app notification to Firestore for the user's notification screen.
@@ -74,6 +75,28 @@ const notifyNewMessage = async (req, res, next) => {
       message: notificationText,
       data: { type: 'chat', conversationId },
     });
+
+    // 3. Dispatch Email notification to receiver if email is found
+    try {
+      const receiverSnap = await db.collection('users').doc(receiverId).get();
+      if (receiverSnap.exists) {
+        const receiverData = receiverSnap.data();
+        const receiverEmail = receiverData?.email;
+        const receiverName = receiverData?.fullName || receiverData?.name || 'User';
+
+        if (receiverEmail) {
+          emailService.sendChatMessageEmail({
+            to: receiverEmail,
+            receiverName,
+            senderName: senderName || 'Someone',
+            messagePreview: notificationText,
+            conversationId,
+          }).catch(err => console.error('Chat message email dispatch failed:', err.message));
+        }
+      }
+    } catch (emailErr) {
+      console.warn('Could not fetch receiver email for chat notification:', emailErr.message);
+    }
 
     return res.status(200).json({ success: true });
   } catch (error) {
@@ -180,5 +203,204 @@ const notifyGeneric = async (req, res, next) => {
   }
 };
 
-module.exports = { notifyNewMessage, notifyPropertyUpdate, notifyGeneric };
+/**
+ * POST /api/notify/login-alert
+ * Dispatches a branded security alert email to the user when they sign in.
+ *
+ * Body: { device, location, email, name }
+ * Auth: Required
+ */
+const notifyLoginAlert = async (req, res, next) => {
+  try {
+    const uid = req.user?.uid;
+    const bodyEmail = req.body?.email;
+    const userEmail = req.user?.email || bodyEmail;
+
+    if (!userEmail) {
+      return res.status(400).json({ success: false, error: 'User email not found' });
+    }
+
+    let userName = req.body?.name || req.user?.name;
+    if (!userName && uid) {
+      try {
+        const userDoc = await db.collection('users').doc(uid).get();
+        if (userDoc.exists) {
+          userName = userDoc.data()?.fullName || userDoc.data()?.name;
+        }
+      } catch (_) {}
+    }
+
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'Protected';
+    const device = req.body?.device || req.headers['user-agent'] || 'Web / Mobile Client';
+    const location = req.body?.location;
+    const loginTime = new Date().toUTCString();
+
+    // 1. Send branded login security email asynchronously
+    emailService.sendLoginAlert({
+      to: userEmail,
+      name: userName || 'Valued User',
+      time: loginTime,
+      ip,
+      device,
+      location,
+    }).catch(err => console.error('Login alert email error:', err.message));
+
+    // 2. Save in-app notification in Firestore
+    if (uid) {
+      await saveInAppNotification({
+        userId: uid,
+        title: '🔐 New Sign-in Detected',
+        message: `New sign-in from ${device} at ${loginTime}`,
+        type: 'security',
+      });
+    }
+
+    return res.status(200).json({ success: true, message: 'Login security alert dispatched' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/notify/welcome
+ * Sends a welcome email to a newly registered user and alerts administrators.
+ *
+ * Body: { fullName, role }
+ * Auth: Required
+ */
+const notifyWelcome = async (req, res, next) => {
+  try {
+    const uid = req.user?.uid;
+    const userEmail = req.user?.email || req.body?.email;
+    const fullName = req.body?.fullName || req.user?.name;
+    const role = req.body?.role || 'tenant';
+
+    if (!userEmail) {
+      return res.status(400).json({ success: false, error: 'User email not found' });
+    }
+
+    // 1. Send welcome email and alert admin
+    emailService.sendWelcomeEmail({
+      to: userEmail,
+      name: fullName || 'Friend',
+      role,
+    }).catch(err => console.error('Welcome email dispatch error:', err.message));
+
+    // 2. Save in-app notification
+    if (uid) {
+      await saveInAppNotification({
+        userId: uid,
+        title: '🎉 Welcome to Agent!',
+        message: 'Your account is now ready. Explore verified properties with secure escrow protection.',
+        type: 'system',
+      });
+    }
+
+    return res.status(200).json({ success: true, message: 'Welcome email sent' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/notify/enquiry
+ * Dispatches an enquiry / tour notification email to the property owner
+ * and alerts Customer Care / Admins.
+ *
+ * Body: { propertyId, propertyTitle, message, tourDate, tourTime, landlordId }
+ * Auth: Required
+ */
+const notifyPropertyEnquiry = async (req, res, next) => {
+  try {
+    const prospectUid = req.user?.uid;
+    const { propertyId, propertyTitle, message, tourDate, tourTime, landlordId: inputLandlordId } = req.body;
+
+    if (!propertyId) {
+      return res.status(400).json({ success: false, error: 'Missing propertyId' });
+    }
+
+    // 1. Fetch prospect info from Firestore
+    let prospectName = req.user?.name || 'Interested Client';
+    let prospectEmail = req.user?.email || '';
+    let prospectPhone = 'N/A';
+
+    if (prospectUid) {
+      try {
+        const pSnap = await db.collection('users').doc(prospectUid).get();
+        if (pSnap.exists) {
+          const pData = pSnap.data();
+          prospectName = pData?.fullName || pData?.name || prospectName;
+          prospectEmail = pData?.email || prospectEmail;
+          prospectPhone = pData?.phoneNumber || pData?.phone || 'N/A';
+        }
+      } catch (_) {}
+    }
+
+    // 2. Fetch property & owner info
+    let targetLandlordId = inputLandlordId;
+    let finalPropertyTitle = propertyTitle || 'Property Listing';
+    try {
+      const propSnap = await db.collection('properties').doc(propertyId).get();
+      if (propSnap.exists) {
+        const propData = propSnap.data();
+        targetLandlordId = targetLandlordId || propData?.landlordId || propData?.ownerId;
+        finalPropertyTitle = propData?.title || finalPropertyTitle;
+      }
+    } catch (_) {}
+
+    // 3. Fetch landlord contact details
+    let ownerEmail = null;
+    let ownerName = 'Property Owner';
+    if (targetLandlordId) {
+      try {
+        const ownerSnap = await db.collection('users').doc(targetLandlordId).get();
+        if (ownerSnap.exists) {
+          const oData = ownerSnap.data();
+          ownerEmail = oData?.email;
+          ownerName = oData?.fullName || oData?.name || 'Property Owner';
+        }
+      } catch (_) {}
+    }
+
+    // Fallback to customer care if landlord email is missing
+    const destinationEmail = ownerEmail || 'customercare@agentmobiletech.com';
+
+    // 4. Dispatch Email to Owner & Admins
+    emailService.sendPropertyEnquiryEmail({
+      to: destinationEmail,
+      ownerName,
+      prospectName,
+      prospectEmail: prospectEmail || 'Via Agent In-App Chat',
+      prospectPhone,
+      propertyTitle: finalPropertyTitle,
+      message: message || 'Hello, I am interested in this property and would like more details / to arrange an inspection.',
+      tourDate,
+      tourTime,
+    }).catch(err => console.error('Enquiry email dispatch error:', err.message));
+
+    // 5. In-app notification to landlord
+    if (targetLandlordId && targetLandlordId !== prospectUid) {
+      await saveInAppNotification({
+        userId: targetLandlordId,
+        title: `🔑 New Enquiry: "${finalPropertyTitle}"`,
+        message: `${prospectName} is interested in your property. Check your messages to reply.`,
+        type: 'property_inquiry',
+        targetId: propertyId,
+      });
+    }
+
+    return res.status(200).json({ success: true, message: 'Enquiry email dispatched' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  notifyNewMessage,
+  notifyPropertyUpdate,
+  notifyGeneric,
+  notifyLoginAlert,
+  notifyWelcome,
+  notifyPropertyEnquiry,
+};
 

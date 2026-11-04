@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { db, admin } = require('../config/firebase');
 const flutterwaveService = require('../services/flutterwaveService');
 const { sendPushNotification } = require('../services/onesignalService');
+const emailService = require('../services/emailService');
 
 function generateSixDigitPin() {
   return Math.floor(100000 + crypto.randomInt(900000)).toString();
@@ -84,6 +85,31 @@ const handleWebhook = async (req, res, next) => {
             message: `₦${amountPaid.toLocaleString()} has been credited to your Agent wallet via Flutterwave.`,
             data: { type: 'wallet', transactionId: txRef },
           });
+
+          // Send payment confirmation email to user & notify billing team
+          try {
+            let userEmail = payload.data?.customer?.email;
+            let userName = payload.data?.customer?.name;
+            if (!userEmail && userId) {
+              const uDoc = await db.collection('users').doc(userId).get();
+              if (uDoc.exists) {
+                userEmail = uDoc.data()?.email;
+                userName = uDoc.data()?.fullName || uDoc.data()?.name;
+              }
+            }
+            if (userEmail) {
+              emailService.sendPaymentReceivedEmail({
+                to: userEmail,
+                name: userName || 'Valued User',
+                amount: amountPaid,
+                txRef,
+                type: 'Wallet Deposit',
+                date: new Date().toUTCString(),
+              }).catch(err => console.error('Deposit confirmation email error:', err.message));
+            }
+          } catch (mailErr) {
+            console.warn('Deposit email handling error:', mailErr.message);
+          }
         }
         return res.status(200).json({ success: true, message: 'Wallet deposit processed' });
       }
@@ -172,6 +198,45 @@ const handleWebhook = async (req, res, next) => {
           data: { type: 'escrow', transactionId: txRef },
         });
       }
+
+      // ── Email Receipts & Admin Notifications ──────────────────────────────
+      // 1. Send receipt to Tenant
+      try {
+        if (tenantEmail) {
+          emailService.sendPaymentReceivedEmail({
+            to: tenantEmail,
+            name: tenantName,
+            amount: amountPaid,
+            txRef,
+            type: 'Escrow Vault Rent Deposit',
+            propertyTitle: txData.propertyTitle || 'Property Rent',
+            date: new Date().toUTCString(),
+          }).catch(err => console.error('Tenant escrow email error:', err.message));
+        }
+      } catch (_) {}
+
+      // 2. Send confirmation to Landlord
+      try {
+        if (landlordId) {
+          const lDoc = await db.collection('users').doc(landlordId).get();
+          if (lDoc.exists) {
+            const lData = lDoc.data();
+            const landlordEmail = lData?.email;
+            const landlordName = lData?.fullName || lData?.name || 'Property Owner';
+            if (landlordEmail) {
+              emailService.sendPaymentReceivedEmail({
+                to: landlordEmail,
+                name: landlordName,
+                amount: netPayoutAmount,
+                txRef,
+                type: 'Rent Deposit Secured in Escrow Vault',
+                propertyTitle: txData.propertyTitle || 'Property Rent',
+                date: new Date().toUTCString(),
+              }).catch(err => console.error('Landlord escrow email error:', err.message));
+            }
+          }
+        }
+      } catch (_) {}
     }
 
     // ── Handle withdrawal transfer completion / failure webhook ───────────────
@@ -214,6 +279,40 @@ const handleWebhook = async (req, res, next) => {
               message: `₦${transferAmount.toLocaleString()} has been deposited to your bank account.`,
               data: { type: 'wallet', transactionId: transferRef },
             });
+
+            // Send confirmation email to user & alert billing team
+            try {
+              const uDoc = await db.collection('users').doc(userId).get();
+              if (uDoc.exists) {
+                const uData = uDoc.data();
+                const userEmail = uData?.email;
+                const userName = uData?.fullName || uData?.name || 'User';
+
+                if (userEmail) {
+                  emailService.sendPaymentReceivedEmail({
+                    to: userEmail,
+                    name: userName,
+                    amount: transferAmount,
+                    txRef: transferRef,
+                    type: 'Bank Account Payout Disbursed',
+                    date: new Date().toUTCString(),
+                  }).catch(err => console.error('Withdrawal user email error:', err.message));
+                }
+
+                emailService.sendAdminAlert({
+                  subject: `💸 Direct Withdrawal Completed: ₦${transferAmount.toLocaleString()} — ${userName}`,
+                  title: 'Withdrawal Successfully Disbursed',
+                  details: {
+                    'User': `${userName} (${userEmail || userId})`,
+                    'Amount': `₦${transferAmount.toLocaleString()}`,
+                    'Reference': transferRef,
+                    'Status': 'CLEARED / TRANSFERRED',
+                    'Disbursed At': new Date().toUTCString(),
+                  },
+                  recipients: emailService.BILLING_EMAILS,
+                }).catch(err => console.error('Withdrawal admin alert error:', err.message));
+              }
+            } catch (_) {}
           }
         } else if (transferStatus === 'FAILED') {
           console.error(`❌ Transfer FAILED for ref=${transferRef}, reason=${failureReason}. Executing automatic refund...`);
