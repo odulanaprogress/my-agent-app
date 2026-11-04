@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import '../utils/app_exception.dart';
 
 class ApiClient {
   /// Primary REST API (Points to live Vercel backend via custom domain)
@@ -27,7 +28,7 @@ class ApiClient {
     };
   }
 
-  /// Call the local Express backend (dev only).
+  /// Call the primary REST API.
   static Future<dynamic> get(String endpoint) async {
     try {
       final headers = await _getHeaders();
@@ -35,11 +36,13 @@ class ApiClient {
       final response = await http.get(uri, headers: headers);
       return _processResponse(response);
     } catch (e) {
-      throw Exception('API Network Request Failed: $e');
+      if (e is AppException) rethrow;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      throw AppException(msg);
     }
   }
 
-  /// Call the local Express backend (dev only).
+  /// Call the primary REST API.
   static Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
     try {
       final headers = await _getHeaders();
@@ -51,12 +54,13 @@ class ApiClient {
       );
       return _processResponse(response);
     } catch (e) {
-      throw Exception('API Network Request Failed: $e');
+      if (e is AppException) rethrow;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      throw AppException(msg);
     }
   }
 
   /// Call the Cloudflare Workers secure API.
-  /// Use this for AI and non-Flutterwave operations.
   static Future<dynamic> workerPost(String path, Map<String, dynamic> body) async {
     try {
       final headers = await _getHeaders();
@@ -68,12 +72,13 @@ class ApiClient {
       );
       return _processResponse(response);
     } catch (e) {
-      throw Exception('Workers API Request Failed: $e');
+      if (e is AppException) rethrow;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      throw AppException(msg);
     }
   }
 
-  /// Call the Railway backend (static IP whitelisted on Flutterwave).
-  /// Use this for all withdrawal/payout operations.
+  /// Call the payouts backend (static IP whitelisted on Flutterwave).
   static Future<dynamic> railwayPost(String path, Map<String, dynamic> body) async {
     try {
       final headers = await _getHeaders();
@@ -85,17 +90,27 @@ class ApiClient {
       );
       return _processResponse(response);
     } catch (e) {
-      throw Exception('Workers API Request Failed: $e');
+      if (e is AppException) rethrow;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      throw AppException(msg);
     }
   }
 
   static dynamic _processResponse(http.Response response) {
-    final body = jsonDecode(response.body);
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return body;
-    } else {
-      final errorMsg = body['error'] ?? body['message'] ?? 'HTTP Error ${response.statusCode}';
-      throw Exception(errorMsg);
+    try {
+      final body = jsonDecode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return body;
+      } else {
+        final errorMsg = body['error'] ?? body['message'] ?? 'HTTP Error ${response.statusCode}';
+        throw AppException(errorMsg.toString());
+      }
+    } catch (e) {
+      if (e is AppException) rethrow;
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return response.body;
+      }
+      throw AppException('Server Error (${response.statusCode})');
     }
   }
 }
