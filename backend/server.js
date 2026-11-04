@@ -101,12 +101,18 @@ app.get('/api/health', (req, res) => {
     }
   }
 
+  const flwRaw = process.env.FLUTTERWAVE_SECRET_KEY || '';
+  const flwPrefix = flwRaw ? flwRaw.slice(0, 10) + '...' + flwRaw.slice(-4) : 'not_set';
+  const flwLen = flwRaw.length;
+
   res.status(200).json({
     status: 'online',
     service: 'Agent Real Estate Platform REST API',
     firebaseServiceAccount: envStatus,
-    flutterwaveKeyConfigured: !!(process.env.FLUTTERWAVE_SECRET_KEY || 'FLWSECK-cffcd8414166c11c09046a0b37605d8f-1a05591bf14vt-X'),
-    bridgeConfigured: !!(process.env.PHP_BRIDGE_URL || 'https://summerinspectlog.com/flutterwave-bridge.php'),
+    flwKeyInEnv: flwPrefix,
+    flwKeyLength: flwLen,
+    bridgeUrlInEnv: process.env.PHP_BRIDGE_URL || 'not_set',
+    bridgeTokenInEnv: process.env.PHP_BRIDGE_TOKEN ? 'set' : 'not_set',
     parseError: parseError,
     timestamp: new Date().toISOString(),
   });
