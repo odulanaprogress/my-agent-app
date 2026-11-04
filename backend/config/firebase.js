@@ -2,21 +2,30 @@ const admin = require('firebase-admin');
 const path = require('path');
 const fs = require('fs');
 
-// Initialize Firebase Admin SDK
+function parseServiceAccount(rawInput) {
+  if (!rawInput) return null;
+  let raw = rawInput.trim();
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+    try {
+      raw = JSON.parse(raw);
+    } catch (_) {
+      raw = raw.slice(1, -1);
+    }
+  }
+  const sa = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (sa && sa.private_key && typeof sa.private_key === 'string') {
+    sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+  }
+  return sa;
+}
+
 if (!admin.apps.length) {
   try {
     let serviceAccount = null;
 
     if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
       try {
-        let raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON.trim();
-        if (raw.startsWith('"') && raw.endsWith('"')) {
-          raw = JSON.parse(raw);
-        }
-        serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (serviceAccount.private_key && typeof serviceAccount.private_key === 'string') {
-          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-        }
+        serviceAccount = parseServiceAccount(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
       } catch (parseErr) {
         console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', parseErr.message);
       }
@@ -31,12 +40,12 @@ if (!admin.apps.length) {
       }
     }
 
-    if (serviceAccount) {
+    if (serviceAccount && serviceAccount.private_key) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
         projectId: serviceAccount.project_id || 'agent-app-67bc4',
       });
-      console.log('✅ Firebase Admin SDK initialized with service account');
+      console.log('✅ Firebase Admin SDK initialized with service account:', serviceAccount.client_email);
     } else {
       admin.initializeApp({
         projectId: 'agent-app-67bc4',
