@@ -162,19 +162,55 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 resolvedAccountName = name.toString();
               });
             } catch (e) {
+              // If GTBank failed, check if this is an OPay or PalmPay account
+              if (bank == '058') {
+                try {
+                  final opayRes = await EscrowApiService().resolveAccountName(
+                    accountNumber: acct,
+                    bankCode: '100004',
+                  );
+                  final opayData = opayRes['data'] as Map<String, dynamic>?;
+                  if (opayData != null && opayData['account_name'] != null) {
+                    setModalState(() {
+                      selectedBankCode = '100004';
+                      selectedBankName = 'OPay Digital Services';
+                      isResolving = false;
+                      resolvedAccountName = opayData['account_name'].toString();
+                      resolveError = null;
+                    });
+                    return;
+                  }
+                } catch (_) {}
+              }
+
               final msg = extractErrorMessage(e);
-              final isCors = msg.toLowerCase().contains('cors') ||
-                  msg.toLowerCase().contains('xmlhttprequest') ||
-                  msg.toLowerCase().contains('failed to fetch') ||
-                  msg.toLowerCase().contains('network') ||
-                  msg.contains('minified') ||
-                  msg.startsWith('Instance of ');
-              setModalState(() {
-                isResolving = false;
-                resolveError = isCors
-                    ? 'Account name lookup unavailable on web. You can still proceed with the transfer.'
-                    : '$msg — You can still proceed with the transfer if the account number is correct.';
-              });
+              final lower = msg.toLowerCase();
+              final isAccountError = lower.contains('invalid account') ||
+                  lower.contains('could not resolve') ||
+                  lower.contains('unable to resolve') ||
+                  lower.contains('account number') ||
+                  lower.contains('not found') ||
+                  lower.contains('invalid nuban');
+
+              if (isAccountError) {
+                setModalState(() {
+                  isResolving = false;
+                  resolveError = 'Account not found for $selectedBankName. If this is a digital bank (e.g. OPay, PalmPay, Kuda), please select it from the bank list.';
+                });
+              } else {
+                final isCors = lower.contains('cors') ||
+                    lower.contains('xmlhttprequest') ||
+                    lower.contains('failed to fetch') ||
+                    lower.contains('network') ||
+                    lower.contains('minified') ||
+                    lower.startsWith('instance of ');
+                setModalState(() {
+                  isResolving = false;
+                  resolveError = isCors
+                      ? 'Account name lookup unavailable on web. You can still proceed with the transfer.'
+                      : '$msg — You can still proceed with the transfer if the account number is correct.';
+                });
+              }
             }
           }
 

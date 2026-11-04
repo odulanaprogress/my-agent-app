@@ -171,11 +171,13 @@ class FirebaseAuthService {
       }
 
       return userCredential;
+    } on FirebaseAuthException {
+      rethrow;
     } catch (e) {
       debugPrint('Google Sign-In Error: $e');
       throw FirebaseAuthException(
         code: 'google-signin-failed',
-        message: 'Google Sign-In failed: ${e.toString()}',
+        message: e.toString().replaceFirst('Exception: ', ''),
       );
     }
   }

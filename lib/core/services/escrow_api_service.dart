@@ -128,23 +128,34 @@ class EscrowApiService {
     required String accountNumber,
     required String bankCode,
   }) async {
-    final res = await ApiClient.post('/bank/resolve', {
-      'accountNumber': accountNumber.trim(),
-      'bankCode': bankCode.trim(),
-    });
+    dynamic res;
+    // 1. Try Cloudflare Workers edge first (edge.agentmobiletech.com)
+    try {
+      res = await ApiClient.workerPost('/bank/resolve', {
+        'accountNumber': accountNumber.trim(),
+        'bankCode': bankCode.trim(),
+      });
+    } catch (_) {
+      // 2. Fallback to primary REST API (api.agentmobiletech.com)
+      res = await ApiClient.post('/bank/resolve', {
+        'accountNumber': accountNumber.trim(),
+        'bankCode': bankCode.trim(),
+      });
+    }
 
-    if (res['success'] == true && res['data'] != null) {
-      // Normalize to the shape the existing UI expects
+    if (res != null && (res['success'] == true || res['status'] == 'success') && res['data'] != null) {
+      final data = res['data'] as Map<String, dynamic>;
       return {
         'status': 'success',
         'data': {
-          'account_name': res['data']['accountName'],
-          'account_number': res['data']['accountNumber'],
+          'account_name': data['accountName'] ?? data['account_name'] ?? 'Account Verified',
+          'account_number': data['accountNumber'] ?? data['account_number'] ?? accountNumber.trim(),
         },
       };
     }
 
-    throw AppException(res['error']?.toString() ?? 'Unable to resolve account number.');
+    final errorMsg = res?['error']?.toString() ?? res?['message']?.toString() ?? 'Unable to resolve account number.';
+    throw AppException(errorMsg);
   }
 
   /// Request a withdrawal — server reads the real balance, validates,

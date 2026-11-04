@@ -11,8 +11,17 @@ import 'package:agent_app/core/widgets/app_loader.dart';
 
 /// Maps Firebase error codes to human-friendly messages.
 String _friendlyError(String? raw) {
-  if (raw == null) return 'Oops! Something went wrong. Please try again.';
+  if (raw == null || raw.trim().isEmpty) return 'Oops! Something went wrong. Please try again.';
   final r = raw.toLowerCase();
+  if (r.contains('popup-closed-by-user') || r.contains('cancelled-popup-request') || r.contains('canceled') || r.contains('cancelled')) {
+    return 'Google Sign-In popup was closed or cancelled.';
+  }
+  if (r.contains('popup-blocked')) {
+    return 'The sign-in popup was blocked by your browser. Please allow popups for this site.';
+  }
+  if (r.contains('unauthorized-domain')) {
+    return 'Domain not authorized for sign-in. Please ensure this domain is added to authorized domains.';
+  }
   if (r.contains('wrong-password') || r.contains('invalid-credential') || r.contains('invalid credential')) {
     return 'Hmm, that email or password isn\'t quite right. Give it another shot!';
   }
@@ -37,7 +46,16 @@ String _friendlyError(String? raw) {
   if (r.contains('invalid-email')) {
     return 'Please enter a valid email address format (e.g., name@example.com).';
   }
-  return 'Login failed. Please double-check your details and try again.';
+  // Strip common technical prefixes
+  String clean = raw;
+  final match = RegExp(r'\[.*?\]\s*(.*)').firstMatch(raw);
+  if (match != null && match.group(1) != null && match.group(1)!.isNotEmpty) {
+    clean = match.group(1)!;
+  }
+  if (clean.startsWith('Exception: ')) {
+    clean = clean.substring('Exception: '.length);
+  }
+  return clean.isNotEmpty ? clean : 'Login failed. Please try again.';
 }
 
 class LoginScreen extends ConsumerStatefulWidget {
