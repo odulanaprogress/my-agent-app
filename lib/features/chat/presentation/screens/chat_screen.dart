@@ -143,8 +143,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           final dir = await getTemporaryDirectory();
           path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
         }
+        final recordConfig = kIsWeb
+            ? const RecordConfig(encoder: AudioEncoder.opus)
+            : const RecordConfig(encoder: AudioEncoder.aacLc);
         await _audioRecorder.start(
-          const RecordConfig(encoder: AudioEncoder.aacLc),
+          recordConfig,
           path: path,
         );
         _recordingSeconds = 0;
@@ -229,9 +232,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _uploadStatus = 'Uploading voice...';
     });
     try {
+      final ext = kIsWeb ? 'webm' : 'm4a';
       final url = await CloudinaryService().uploadMediaBytes(
         bytes,
-        filename: 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a',
+        filename: 'voice_${DateTime.now().millisecondsSinceEpoch}.$ext',
         resourceType: 'video',
       );
       if (url != null) {

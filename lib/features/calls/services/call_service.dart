@@ -21,15 +21,19 @@ class CallService {
     _incomingCallSub = _firestore
         .collection('calls')
         .where('receiverId', isEqualTo: currentUser.uid)
-        .where('status', isEqualTo: CallStatus.calling.name)
         .snapshots()
         .listen((snapshot) {
       for (final doc in snapshot.docs) {
         final call = CallModel.fromFirestore(doc);
+        // Only accept calling or ringing states
+        if (call.status != CallStatus.calling && call.status != CallStatus.ringing) {
+          continue;
+        }
+
         final ageInSeconds = DateTime.now().difference(call.createdAt).inSeconds;
 
-        // Only pop up if created within last 45 seconds and not already active
-        if (ageInSeconds < 45 && _activeIncomingCallId != call.id) {
+        // Only pop up if created within last 60 seconds and not already active
+        if (ageInSeconds < 60 && _activeIncomingCallId != call.id) {
           _activeIncomingCallId = call.id;
 
           // Acknowledge receipt to Firestore so caller transitions from 'Calling...' to 'Ringing...'
@@ -91,11 +95,6 @@ class CallService {
       final callDoc = _firestore.collection('calls').doc();
       final callId = callDoc.id;
 
-      // Check if receiver is online in Firestore
-      final receiverDoc = await _firestore.collection('users').doc(receiverId).get();
-      final isReceiverOnline = receiverDoc.data()?['isOnline'] == true;
-      final initialStatus = isReceiverOnline ? CallStatus.ringing : CallStatus.calling;
-
       final call = CallModel(
         id: callId,
         callerId: currentUser.uid,
@@ -104,7 +103,7 @@ class CallService {
         receiverId: receiverId,
         receiverName: receiverName,
         receiverPhoto: receiverPhoto,
-        status: initialStatus,
+        status: CallStatus.calling,
         createdAt: DateTime.now(),
       );
 

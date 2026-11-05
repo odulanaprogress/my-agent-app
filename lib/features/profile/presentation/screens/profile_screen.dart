@@ -90,6 +90,36 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
 
+                if (role == 'landlord' || role == 'tenant' || role == 'user') ...[
+                  SettingsTile(
+                    icon: role == 'landlord' ? Icons.person_search_rounded : Icons.real_estate_agent_rounded,
+                    title: role == 'landlord' ? 'Switch to Tenant View' : 'Switch to Landlord Dashboard',
+                    subtitle: role == 'landlord' ? 'Browse listings as a regular renter' : 'List and manage properties as a landlord',
+                    onTap: () async {
+                      final targetRole = role == 'landlord' ? 'tenant' : 'landlord';
+                      try {
+                        await ref.read(authNotifierProvider.notifier).switchRole(targetRole);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Switched to ${targetRole == "landlord" ? "Landlord" : "Tenant"} mode!'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          context.go('/auth');
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error switching mode: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
                 SettingsTile(
                   icon: Icons.settings,
                   title: 'Settings',

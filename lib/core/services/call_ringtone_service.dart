@@ -6,11 +6,11 @@ class CallRingtoneService {
   static AudioPlayer? _player;
   static bool _isPlaying = false;
 
-  // Royalty-free, reliable direct audio URLs for telephone tones
+  // Reliable, high-availability direct audio URLs (hosted on Cloudinary with CORS enabled)
   static const String _ringbackToneUrl =
-      'https://cdn.freesound.org/previews/274/274178_5121236-lq.mp3';
+      'https://res.cloudinary.com/dfbzi8cmh/video/upload/v1793846197/qih5t2ghlrfuwjqswbbf.wav';
   static const String _incomingRingtoneUrl =
-      'https://cdn.freesound.org/previews/536/536422_4921277-lq.mp3';
+      'https://res.cloudinary.com/dfbzi8cmh/video/upload/v1793846198/t6i8lcw49lhtpgamey6o.wav';
 
   /// Plays repeating ringback tone (for caller when receiver is ringing)
   static Future<void> playRingback() async {

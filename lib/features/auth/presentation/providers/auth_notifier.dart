@@ -19,6 +19,7 @@ import 'package:agent_app/core/storage/secure_storage_service.dart';
 import 'package:agent_app/core/storage/user_cache_service.dart';
 import 'package:agent_app/core/network/api_client.dart';
 import '../../../../../core/services/security_alert_service.dart';
+import '../../../../core/services/app_startup_service.dart';
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final FirebaseAuthService _authService;
@@ -134,14 +135,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       }
 
-      // If user doc is missing from Firestore, auto-create a basic profile
+      // Direct Firestore doc fetch if repository returned null
+      if (profile == null) {
+        try {
+          final directDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          if (directDoc.exists && directDoc.data() != null) {
+            profile = UserModel.fromMap(directDoc.data()!, directDoc.id);
+          }
+        } catch (_) {}
+      }
+
+      // If user doc is truly missing from Firestore, auto-create a basic profile
       if (profile == null) {
         debugPrint('[AuthNotifier] No profile found for ${user.uid} — creating fallback.');
+        String initialRole = 'tenant';
+        try {
+          final savedRole = await AppStartupService().getUserRole();
+          if (savedRole != null && savedRole.isNotEmpty) {
+            initialRole = savedRole;
+          }
+        } catch (_) {}
+
         final autoProfile = cachedProfile ?? UserModel(
           uid: user.uid,
           email: user.email ?? '',
           fullName: user.displayName ?? (user.email != null && user.email!.contains('@') ? user.email!.split('@').first : 'User'),
-          role: (userEmail == 'agentadminsupport@gmail.com' || userEmail == 'admin@agentmobiletech.com' || userEmail == 'progressodulana@agentmobiletech.com') ? 'admin' : 'tenant',
+          role: (userEmail == 'agentadminsupport@gmail.com' || userEmail == 'admin@agentmobiletech.com' || userEmail == 'progressodulana@agentmobiletech.com') ? 'admin' : initialRole,
           isVerified: user.emailVerified,
           privacyAccepted: true,
           onboardingCompleted: false,
@@ -150,19 +169,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
         profile = autoProfile;
         try {
-          await _userFirestoreService.createUserProfile(autoProfile);
-          // Dispatch welcome email and admin alert for first-time Google sign-in
-          Future.microtask(() async {
-            try {
-              await ApiClient.post('/notify/welcome', {
-                'fullName': autoProfile.fullName,
-                'role': autoProfile.role,
-                'email': autoProfile.email,
-              });
-            } catch (e) {
-              debugPrint('Welcome email dispatch error on Google Sign-in: $e');
-            }
-          });
+          final docCheck = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          if (!docCheck.exists) {
+            await _userFirestoreService.createUserProfile(autoProfile);
+            Future.microtask(() async {
+              try {
+                await ApiClient.post('/notify/welcome', {
+                  'fullName': autoProfile.fullName,
+                  'role': autoProfile.role,
+                  'email': autoProfile.email,
+                });
+              } catch (_) {}
+            });
+          } else {
+            profile = UserModel.fromMap(docCheck.data()!, docCheck.id);
+          }
         } catch (e) {
           debugPrint('[AuthNotifier] Failed to persist profile to Firestore: $e');
         }
@@ -170,14 +191,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       // Settle authenticated state safely
       try {
-        await cacheService.saveUser(profile);
+        if (profile != null) {
+          await cacheService.saveUser(profile);
+        }
       } catch (_) {}
 
       _ref.read(currentUserProvider.notifier).state = profile;
       state = state.copyWith(status: AuthStatus.authenticated);
 
       // Dispatch session login alert once per session/launch
-      if (!_hasDispatchedSessionLoginAlert) {
+      if (!_hasDispatchedSessionLoginAlert && profile != null) {
         _hasDispatchedSessionLoginAlert = true;
         final alertEmail = profile.email;
         final alertName = profile.fullName;
@@ -395,6 +418,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
       throw Exception(e.message ?? 'An error occurred while sending the verification email.');
     } catch (e) {
       throw Exception('An unexpected error occurred.');
+    }
+  }
+
+  /// Switch the user's active role between 'landlord' and 'tenant'
+  Future<void> switchRole(String newRole) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'role': newRole,
+      }, SetOptions(merge: true));
+      final updatedProfile = await _userFirestoreService.getUserProfile(user.uid);
+      if (updatedProfile != null) {
+        _ref.read(currentUserProvider.notifier).state = updatedProfile;
+        await UserCacheService().saveUser(updatedProfile);
+        await AppStartupService().saveUserRole(newRole);
+      }
+    } catch (e) {
+      debugPrint('[AuthNotifier] switchRole error: $e');
+      rethrow;
     }
   }
 }
