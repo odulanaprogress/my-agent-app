@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -69,6 +70,40 @@ class CloudinaryService {
       } else {
         return null;
       }
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Upload audio or media from raw in-memory bytes.
+  /// Works seamlessly on Web, Android, iOS without relying on local file paths.
+  Future<String?> uploadMediaBytes(
+    Uint8List bytes, {
+    String filename = 'audio.m4a',
+    String resourceType = 'video',
+  }) async {
+    try {
+      final uri = Uri.parse(
+        'https://api.cloudinary.com/v1_1/$cloudName/$resourceType/upload',
+      );
+
+      final request = http.MultipartRequest('POST', uri);
+      request.fields['upload_preset'] = uploadPreset;
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: filename,
+        ),
+      );
+
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        final responseData = await response.stream.bytesToString();
+        final decodedData = jsonDecode(responseData);
+        return decodedData['secure_url'];
+      }
+      return null;
     } catch (e) {
       return null;
     }

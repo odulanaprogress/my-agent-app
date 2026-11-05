@@ -99,4 +99,26 @@ const requireAuth = async (req, res, next) => {
   }
 };
 
-module.exports = { requireAuth };
+/**
+ * Optional / Tolerant Auth Middleware:
+ * If a valid Authorization token is provided, sets req.user.
+ * Otherwise, allows the request through without rejecting with 401.
+ */
+const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split('Bearer ')[1].trim();
+      try {
+        req.user = await admin.auth().verifyIdToken(token);
+      } catch (_) {
+        try {
+          req.user = await verifyFirebaseTokenJWK(token, 'agent-app-67bc4');
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+  return next();
+};
+
+module.exports = { requireAuth, optionalAuth };

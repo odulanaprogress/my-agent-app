@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:agent_app/features/calls/models/call_model.dart';
 import 'package:agent_app/features/calls/services/call_service.dart';
+import 'package:agent_app/core/services/call_ringtone_service.dart';
 
 class VoiceCallScreen extends StatefulWidget {
   final String callId;
@@ -44,6 +45,12 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
     _status = widget.isIncoming ? CallStatus.ringing : CallStatus.calling;
 
+    if (widget.isIncoming) {
+      CallRingtoneService.playIncomingRing();
+    } else if (_status == CallStatus.ringing) {
+      CallRingtoneService.playRingback();
+    }
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -59,6 +66,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     if (!widget.isIncoming) {
       _ringTimeoutTimer = Timer(const Duration(seconds: 45), () {
         if (mounted && (_status == CallStatus.calling || _status == CallStatus.ringing)) {
+          CallRingtoneService.stop();
           CallService.endCall(widget.callId);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -81,6 +89,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         .snapshots()
         .listen((snapshot) {
       if (!snapshot.exists) {
+        CallRingtoneService.stop();
         _endAndClose();
         return;
       }
@@ -91,13 +100,17 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
           _status = call.status;
         });
 
-        if (call.status == CallStatus.connected) {
+        if (call.status == CallStatus.ringing && !widget.isIncoming) {
+          CallRingtoneService.playRingback();
+        } else if (call.status == CallStatus.connected) {
+          CallRingtoneService.stop();
           _ringTimeoutTimer?.cancel();
           if (_durationTimer == null) {
             _startDurationTimer();
           }
         } else if (call.status == CallStatus.ended ||
             call.status == CallStatus.declined) {
+          CallRingtoneService.stop();
           _endAndClose();
         }
       }
@@ -127,6 +140,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   }
 
   Future<void> _acceptCall() async {
+    CallRingtoneService.stop();
     await CallService.acceptCall(widget.callId);
     if (mounted) {
       setState(() {
@@ -137,6 +151,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   }
 
   void _endAndClose() {
+    CallRingtoneService.stop();
     _durationTimer?.cancel();
     _callSub?.cancel();
     if (mounted) {
@@ -153,11 +168,28 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   @override
   void dispose() {
+    CallRingtoneService.stop();
     _pulseController.dispose();
     _durationTimer?.cancel();
     _ringTimeoutTimer?.cancel();
     _callSub?.cancel();
     super.dispose();
+  }
+
+  String _getCallStatusLabel() {
+    if (_status == CallStatus.connected) {
+      return _formatDuration(_callDurationSeconds);
+    }
+    if (widget.isIncoming) {
+      return 'Incoming Call...';
+    }
+    if (_status == CallStatus.calling) {
+      return 'Calling...';
+    }
+    if (_status == CallStatus.ringing) {
+      return 'Ringing...';
+    }
+    return 'Connecting...';
   }
 
   @override
@@ -277,9 +309,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                _status == CallStatus.connected
-                    ? _formatDuration(_callDurationSeconds)
-                    : (widget.isIncoming ? 'Incoming Call...' : 'Ringing...'),
+                _getCallStatusLabel(),
                 style: TextStyle(
                   color: _status == CallStatus.connected
                       ? const Color(0xFF10B981)

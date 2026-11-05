@@ -32,6 +32,11 @@ class CallService {
         if (ageInSeconds < 45 && _activeIncomingCallId != call.id) {
           _activeIncomingCallId = call.id;
 
+          // Acknowledge receipt to Firestore so caller transitions from 'Calling...' to 'Ringing...'
+          _firestore.collection('calls').doc(call.id).update({
+            'status': CallStatus.ringing.name,
+          }).catchError((_) {});
+
           final nav = rootNavigatorKey.currentState;
           if (nav != null) {
             nav.push(
@@ -86,6 +91,11 @@ class CallService {
       final callDoc = _firestore.collection('calls').doc();
       final callId = callDoc.id;
 
+      // Check if receiver is online in Firestore
+      final receiverDoc = await _firestore.collection('users').doc(receiverId).get();
+      final isReceiverOnline = receiverDoc.data()?['isOnline'] == true;
+      final initialStatus = isReceiverOnline ? CallStatus.ringing : CallStatus.calling;
+
       final call = CallModel(
         id: callId,
         callerId: currentUser.uid,
@@ -94,7 +104,7 @@ class CallService {
         receiverId: receiverId,
         receiverName: receiverName,
         receiverPhoto: receiverPhoto,
-        status: CallStatus.calling,
+        status: initialStatus,
         createdAt: DateTime.now(),
       );
 

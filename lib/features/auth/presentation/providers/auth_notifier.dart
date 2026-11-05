@@ -25,6 +25,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final UserFirestoreService _userFirestoreService;
   final Ref _ref;
   int _failedLoginAttempts = 0;
+  bool _hasDispatchedSessionLoginAlert = false;
 
   AuthNotifier(
     this._authService, {
@@ -39,20 +40,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void _listenToAuthChanges() {
     _authService.authStateChanges.listen((User? user) async {
       if (user == null) {
+        _hasDispatchedSessionLoginAlert = false;
         _ref.read(currentUserProvider.notifier).state = null;
         state = state.copyWith(status: AuthStatus.unauthenticated);
         CallService.stopListening();
-        if (!kIsWeb) {
-          try { OneSignal.logout(); } catch (_) {}
-        }
+        try { OneSignal.logout(); } catch (_) {}
         return;
       }
 
       // Link this device to the user's Firebase UID so OneSignal can target them
       CallService.listenForIncomingCalls();
-      if (!kIsWeb) {
-        try { OneSignal.login(user.uid); } catch (_) {}
-      }
+      try { OneSignal.login(user.uid); } catch (_) {}
+
+      // Update online presence
+      try {
+        FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'isOnline': true,
+          'lastSeen': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
 
       final cacheService = UserCacheService();
       UserModel? cachedProfile;
@@ -169,6 +175,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       _ref.read(currentUserProvider.notifier).state = profile;
       state = state.copyWith(status: AuthStatus.authenticated);
+
+      // Dispatch session login alert once per session/launch
+      if (!_hasDispatchedSessionLoginAlert) {
+        _hasDispatchedSessionLoginAlert = true;
+        final alertEmail = profile.email;
+        final alertName = profile.fullName;
+        Future.microtask(() async {
+          try {
+            await ApiClient.post('/notify/login-alert', {
+              'device': kIsWeb ? 'Web Browser' : 'Mobile App',
+              'email': alertEmail,
+              'name': alertName,
+            });
+          } catch (_) {}
+        });
+      }
 
       // Background telemetry & welcome notification — never block auth
       try {
@@ -294,6 +316,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // 0. Update presence to offline in Firestore
+    final currentUid = _authService.currentUser?.uid;
+    if (currentUid != null) {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(currentUid).set({
+          'isOnline': false,
+          'lastSeen': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
+    }
+
     // 1. Immediately reset memory state so UI and routers react synchronously
     _ref.read(currentUserProvider.notifier).state = null;
     state = const AuthState(status: AuthStatus.unauthenticated);
@@ -305,9 +338,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     // 3. Fire-and-forget logging and push notification logout without blocking
     UserBehaviorService.logLogout().timeout(const Duration(seconds: 2)).catchError((_) {});
-    if (!kIsWeb) {
-      try { OneSignal.logout(); } catch (_) {}
-    }
+    try { OneSignal.logout(); } catch (_) {}
 
     // 4. Sign out Firebase Auth and Google
     try {

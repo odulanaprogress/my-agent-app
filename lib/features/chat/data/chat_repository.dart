@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/services/onesignal_api_service.dart';
+import '../../../../core/network/api_client.dart';
 
 class ChatRepository {
   final FirebaseFirestore _firestore;
@@ -133,7 +134,7 @@ class ChatRepository {
       });
     });
 
-    // Send push notification
+    // Send push notification & email
     try {
       final senderDoc = await _firestore.collection('users').doc(senderId).get();
       final senderName = senderDoc.data()?['name'] ?? senderDoc.data()?['fullName'] ?? 'Someone';
@@ -143,6 +144,15 @@ class ChatRepository {
         receiverUid: receiverId,
         conversationId: conversationId,
       );
+
+      // Trigger server-side email dispatch
+      ApiClient.post('/notify/message', {
+        'conversationId': conversationId,
+        'receiverId': receiverId,
+        'senderName': senderName,
+        'messageType': 'text',
+        'messagePreview': message.length > 80 ? message.substring(0, 77) + '...' : message,
+      }).catchError((_) {});
     } catch (e) {
       print('Push notification error: $e');
     }
@@ -186,7 +196,7 @@ class ChatRepository {
       });
     });
 
-    // Send push notification
+    // Send push notification & email
     try {
       final senderDoc = await _firestore.collection('users').doc(senderId).get();
       final senderName = senderDoc.data()?['name'] ?? senderDoc.data()?['fullName'] ?? 'Someone';
@@ -196,6 +206,14 @@ class ChatRepository {
         receiverUid: receiverId,
         conversationId: conversationId,
       );
+
+      ApiClient.post('/notify/message', {
+        'conversationId': conversationId,
+        'receiverId': receiverId,
+        'senderName': senderName,
+        'messageType': fileType,
+        'messagePreview': 'Sent an attachment: $fileName',
+      }).catchError((_) {});
     } catch (e) {
       print('Push notification error: $e');
     }
@@ -245,7 +263,7 @@ class ChatRepository {
       });
     });
 
-    // Send push notification
+    // Send push notification & email
     try {
       final senderDoc = await _firestore.collection('users').doc(senderId).get();
       final senderName = senderDoc.data()?['name'] ?? senderDoc.data()?['fullName'] ?? 'Someone';
@@ -255,6 +273,14 @@ class ChatRepository {
         receiverUid: receiverId,
         conversationId: conversationId,
       );
+
+      ApiClient.post('/notify/message', {
+        'conversationId': conversationId,
+        'receiverId': receiverId,
+        'senderName': senderName,
+        'messageType': 'audio',
+        'messagePreview': '🎤 Sent a voice message ($durationStr)',
+      }).catchError((_) {});
     } catch (e) {
       print('Push notification error: $e');
     }

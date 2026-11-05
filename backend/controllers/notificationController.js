@@ -197,6 +197,27 @@ const notifyGeneric = async (req, res, next) => {
       data,
     });
 
+    // 3. If chat notification, also dispatch email preview to targets
+    if (data.type === 'chat' || (data.conversationId && targets.length > 0)) {
+      for (const targetUid of targets) {
+        db.collection('users').doc(targetUid).get().then(snap => {
+          if (snap.exists) {
+            const uData = snap.data();
+            if (uData?.email) {
+              const senderDisplayName = notifTitle.replace('New message from ', '') || 'Someone';
+              emailService.sendChatMessageEmail({
+                to: uData.email,
+                receiverName: uData.fullName || uData.name || 'User',
+                senderName: senderDisplayName,
+                messagePreview: notifMessage,
+                conversationId: data.conversationId || '',
+              }).catch(err => console.error('Chat email error in notifyGeneric:', err.message));
+            }
+          }
+        }).catch(err => console.error('User lookup error in notifyGeneric:', err.message));
+      }
+    }
+
     return res.status(200).json({ success: true, recipientsCount: targets.length });
   } catch (error) {
     next(error);

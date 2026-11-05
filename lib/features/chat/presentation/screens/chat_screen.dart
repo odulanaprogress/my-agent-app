@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +11,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../providers/chat_provider.dart';
 import '../../../../core/services/cloudinary_service.dart';
@@ -67,21 +68,63 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // Track last message count to detect new messages
   int _lastMessageCount = 0;
 
+  Timer? _typingDebounce;
+
+  void _onTypingChanged() {
+    final hasText = _controller.text.trim().isNotEmpty;
+    setState(() {
+      _isTextEmpty = !hasText;
+    });
+
+    if (hasText) {
+      _setTypingState(true);
+      _typingDebounce?.cancel();
+      _typingDebounce = Timer(const Duration(milliseconds: 2500), () {
+        _setTypingState(false);
+      });
+    } else {
+      _setTypingState(false);
+    }
+  }
+
+  void _setTypingState(bool isTyping) {
+    try {
+      FirebaseFirestore.instance
+          .collection('conversations')
+          .doc(widget.conversationId)
+          .set({
+        'typing': {
+          widget.senderId: isTyping,
+        }
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  void _setUserOnline(bool isOnline) {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'isOnline': isOnline,
+          'lastSeen': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     _audioRecorder = AudioRecorder();
-    _controller.addListener(() {
-      setState(() {
-        _isTextEmpty = _controller.text.trim().isEmpty;
-      });
-    });
-
-
+    _controller.addListener(_onTypingChanged);
+    _setUserOnline(true);
   }
 
   @override
   void dispose() {
+    _typingDebounce?.cancel();
+    _setTypingState(false);
+    _controller.removeListener(_onTypingChanged);
     _controller.dispose();
     _scrollController.dispose();
     _recordingTimer?.cancel();
@@ -93,10 +136,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// Tap to START recording
   Future<void> _startRecording() async {
     try {
-      if (await Permission.microphone.request().isGranted) {
-        final dir = await getTemporaryDirectory();
-        final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-        await _audioRecorder.start(const RecordConfig(), path: path);
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (hasPermission) {
+        String path = '';
+        if (!kIsWeb) {
+          final dir = await getTemporaryDirectory();
+          path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        }
+        await _audioRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc),
+          path: path,
+        );
         _recordingSeconds = 0;
         _recordingTimer?.cancel();
         _recordingTimer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -142,7 +192,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _waveformHeights = List.filled(18, 6.0);
       });
       if (path != null) {
-        await _uploadAndSendVoice(File(path));
+        Uint8List audioBytes;
+        if (kIsWeb) {
+          final response = await http.get(Uri.parse(path));
+          audioBytes = response.bodyBytes;
+        } else {
+          audioBytes = await File(path).readAsBytes();
+        }
+        await _uploadAndSendVoiceBytes(audioBytes);
       }
     } catch (e) {
       _snack('Error stopping recording: $e');
@@ -166,13 +223,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  Future<void> _uploadAndSendVoice(File file) async {
+  Future<void> _uploadAndSendVoiceBytes(Uint8List bytes) async {
     setState(() {
       _isUploading = true;
       _uploadStatus = 'Uploading voice...';
     });
     try {
-      final url = await CloudinaryService().uploadVideo(file);
+      final url = await CloudinaryService().uploadMediaBytes(
+        bytes,
+        filename: 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a',
+        resourceType: 'video',
+      );
       if (url != null) {
         final repo = ref.read(chatRepositoryProvider);
         await repo.sendVoiceMessage(
@@ -188,10 +249,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _cancelReply();
         _scrollToBottom();
       } else {
-        _snack('Voice upload failed.');
+        _snack('Failed to upload voice message.');
       }
     } catch (e) {
-      _snack('Error uploading voice: $e');
+      _snack('Failed to send voice: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -237,8 +298,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     try {
-      final file = File(picked.path);
-      final url = await CloudinaryService().uploadImage(file);
+      final bytes = await picked.readAsBytes();
+      final url = await CloudinaryService().uploadMediaBytes(
+        bytes,
+        filename: picked.name,
+        resourceType: 'image',
+      );
       if (url != null) {
         final repo = ref.read(chatRepositoryProvider);
         await repo.sendAttachmentMessage(
@@ -276,8 +341,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     try {
-      final file = File(picked.path);
-      final url = await CloudinaryService().uploadVideo(file);
+      final bytes = await picked.readAsBytes();
+      final url = await CloudinaryService().uploadMediaBytes(
+        bytes,
+        filename: picked.name,
+        resourceType: 'video',
+      );
       if (url != null) {
         final repo = ref.read(chatRepositoryProvider);
         await repo.sendAttachmentMessage(
@@ -309,21 +378,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
+        withData: true,
       );
 
-      if (result == null || result.files.isEmpty || result.files.single.path == null) {
+      if (result == null || result.files.isEmpty) {
         return;
       }
 
-      final file = File(result.files.single.path!);
       final fileName = result.files.single.name;
+      final fileBytes = result.files.single.bytes ??
+          (result.files.single.path != null
+              ? await File(result.files.single.path!).readAsBytes()
+              : null);
+
+      if (fileBytes == null) {
+        _snack('Could not read selected PDF file.');
+        return;
+      }
 
       setState(() {
         _isUploading = true;
         _uploadStatus = 'Uploading $fileName...';
       });
 
-      final url = await CloudinaryService().uploadRawFile(file);
+      final url = await CloudinaryService().uploadMediaBytes(
+        fileBytes,
+        filename: fileName,
+        resourceType: 'raw',
+      );
 
       if (url != null) {
         final repo = ref.read(chatRepositoryProvider);
@@ -650,6 +732,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     // Clear immediately for snappy UX — fire and forget
     _controller.clear();
+    _setTypingState(false);
     final replyId = _replyToId;
     final replyText = _replyToText;
     final replySender = _replyToSender;
@@ -682,6 +765,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         final blockedBy = convData?['blockedBy'] as List<dynamic>? ?? [];
         final isBlocked = blockedBy.isNotEmpty;
         final currentUser = ref.read(currentUserProvider);
+        final typingMap = convData?['typing'] as Map<String, dynamic>?;
+        final isOtherTyping = typingMap?[widget.receiverId] == true;
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
@@ -735,9 +820,55 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const Text(
-                            'Secure Connection',
-                            style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w600),
+                          Builder(
+                            builder: (context) {
+                              if (isOtherTyping) {
+                                return const Row(
+                                  children: [
+                                    Text(
+                                      'typing...',
+                                      style: TextStyle(
+                                        color: Color(0xFF4F46E5),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              } else if (data?['isOnline'] == true) {
+                                return Row(
+                                  children: [
+                                    Container(
+                                      width: 7,
+                                      height: 7,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF10B981),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'Online',
+                                      style: TextStyle(
+                                        color: Color(0xFF10B981),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              } else {
+                                return const Text(
+                                  'Offline',
+                                  style: TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                );
+                              }
+                            },
                           ),
                         ],
                       ),
@@ -977,6 +1108,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                             )
+                          ],
+                        ),
+                      ),
+
+                    if (isOtherTyping)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        color: const Color(0xFFF1F5F9),
+                        child: const Row(
+                          children: [
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF4F46E5),
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'typing a reply...',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4F46E5),
+                                fontStyle: FontStyle.italic,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ],
                         ),
                       ),
