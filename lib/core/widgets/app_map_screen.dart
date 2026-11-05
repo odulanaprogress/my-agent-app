@@ -21,8 +21,20 @@ class AppMapScreen extends StatefulWidget {
     BuildContext context, {
     required String locationQuery,
     String? title,
-  }) {
-    return Navigator.of(context).push(
+  }) async {
+    final query = Uri.encodeComponent(locationQuery.trim());
+    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+
+    // On web, opening Google Maps directly in a new tab avoids WebGL/canvas/iframe blocking
+    if (kIsWeb) {
+      try {
+        final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (launched) return;
+      } catch (_) {}
+    }
+
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AppMapScreen(
           locationQuery: locationQuery,

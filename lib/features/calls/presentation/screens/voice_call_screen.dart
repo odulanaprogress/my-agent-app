@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:agent_app/features/calls/models/call_model.dart';
 import 'package:agent_app/features/calls/services/call_service.dart';
 import 'package:agent_app/core/services/call_ringtone_service.dart';
+import 'package:agent_app/features/calls/services/webrtc_service.dart';
 
 class VoiceCallScreen extends StatefulWidget {
   final String callId;
@@ -32,6 +34,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _callSub;
   CallStatus _status = CallStatus.calling;
+  WebRTCService? _webrtcService;
 
   Timer? _durationTimer;
   Timer? _ringTimeoutTimer;
@@ -59,6 +62,11 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.15).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // Caller initializes WebRTC immediately to start audio session
+    if (!widget.isIncoming) {
+      _startWebRTC(isCaller: true);
+    }
 
     _listenToCallUpdates();
 
@@ -134,6 +142,19 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     return '$minutes:$seconds';
   }
 
+  Future<void> _startWebRTC({required bool isCaller}) async {
+    if (_webrtcService != null) return;
+    _webrtcService = WebRTCService(
+      callId: widget.callId,
+      isCaller: isCaller,
+      isVideo: false,
+      onConnected: () {
+        debugPrint('[VoiceCallScreen] WebRTC audio connected!');
+      },
+    );
+    await _webrtcService!.start();
+  }
+
   Future<void> _endCall() async {
     await CallService.endCall(widget.callId);
     _endAndClose();
@@ -142,6 +163,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   Future<void> _acceptCall() async {
     CallRingtoneService.stop();
     await CallService.acceptCall(widget.callId);
+    await _startWebRTC(isCaller: false);
     if (mounted) {
       setState(() {
         _status = CallStatus.connected;
@@ -154,6 +176,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     CallRingtoneService.stop();
     _durationTimer?.cancel();
     _callSub?.cancel();
+    _webrtcService?.dispose();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -173,6 +196,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _durationTimer?.cancel();
     _ringTimeoutTimer?.cancel();
     _callSub?.cancel();
+    _webrtcService?.dispose();
     super.dispose();
   }
 
@@ -197,9 +221,21 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Top Status Bar
+            // Hidden audio pipeline element so WebRTC audio attaches to DOM in Flutter Web
+            if (_webrtcService?.remoteRenderer != null)
+              Offstage(
+                offstage: true,
+                child: SizedBox(
+                  width: 1,
+                  height: 1,
+                  child: RTCVideoView(_webrtcService!.remoteRenderer!),
+                ),
+              ),
+            Column(
+              children: [
+                // Top Status Bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
@@ -330,8 +366,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
             ),
           ],
         ),
-      ),
-    );
+      ],
+    ),
+  ),
+);
   }
 
   Widget _avatarFallback() {
@@ -351,7 +389,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   }
 
   Widget _buildActionButtons() {
-    if (widget.isIncoming && _status == CallStatus.ringing) {
+    if (widget.isIncoming && _status != CallStatus.connected) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -424,6 +462,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
             GestureDetector(
               onTap: () {
                 setState(() => _isMuted = !_isMuted);
+                _webrtcService?.toggleMute(_isMuted);
               },
               child: Container(
                 width: 58,

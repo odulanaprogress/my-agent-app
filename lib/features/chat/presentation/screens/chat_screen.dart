@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -89,14 +90,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _setTypingState(bool isTyping) {
     try {
-      FirebaseFirestore.instance
+      final docRef = FirebaseFirestore.instance
           .collection('conversations')
-          .doc(widget.conversationId)
-          .set({
-        'typing': {
-          widget.senderId: isTyping,
-        }
-      }, SetOptions(merge: true));
+          .doc(widget.conversationId);
+      docRef.update({
+        'typing.${widget.senderId}': isTyping,
+      }).catchError((_) {
+        docRef.set({
+          'typing': {
+            widget.senderId: isTyping,
+          }
+        }, SetOptions(merge: true));
+      });
     } catch (_) {}
   }
 
@@ -694,6 +699,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return [
       IconButton(
+        icon: const Icon(Icons.videocam_rounded, color: Color(0xFF6366F1)),
+        tooltip: 'Video Call',
+        onPressed: () {
+          CallService.startVideoCall(
+            context,
+            receiverId: widget.receiverId,
+            receiverName: 'User',
+          );
+        },
+      ),
+      IconButton(
         icon: const Icon(Icons.call_rounded, color: Color(0xFF6366F1)),
         tooltip: 'Voice Call',
         onPressed: () {
@@ -1150,98 +1166,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
                         color: Colors.white,
                         child: _isRecording
-                            ? Row(
-                                children: [
-                                  GestureDetector(
-                                    onTap: _cancelRecording,
-                                    child: Container(
-                                      width: 42,
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.shade50,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.delete_outline_rounded,
-                                        color: Colors.redAccent,
-                                        size: 22,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Container(
-                                      height: 46,
-                                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF1F5F9),
-                                        borderRadius: BorderRadius.circular(24),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: const BoxDecoration(
-                                              color: Colors.redAccent,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                              children: List.generate(18, (i) {
-                                                final h = 6.0 + (i * 7) % 20;
-                                                return Container(
-                                                  width: 2.5,
-                                                  height: h,
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFF6366F1),
-                                                    borderRadius: BorderRadius.circular(2),
-                                                  ),
-                                                );
-                                              }),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Text(
-                                            '${_recordingSeconds ~/ 60}:${(_recordingSeconds % 60).toString().padLeft(2, '0')}',
-                                            style: const TextStyle(
-                                              color: Color(0xFF0F172A),
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  GestureDetector(
-                                    onTap: _stopRecordingAndSend,
-                                    child: Container(
-                                      width: 42,
-                                      height: 42,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF6366F1),
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Color(0xFF6366F1),
-                                            blurRadius: 8,
-                                            offset: Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.arrow_upward_rounded,
-                                        color: Colors.white,
-                                        size: 22,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            ? _LiveRecordingWaveform(
+                                heights: _waveformHeights,
+                                recordingSeconds: _recordingSeconds,
+                                onCancel: _cancelRecording,
+                                onSend: _stopRecordingAndSend,
                               )
                             : Row(
                                 children: [
@@ -1488,8 +1417,188 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     } else if (type == 'audio') {
       return AudioWaveformPlayer(audioUrl: fileUrl, isMe: isMe);
-        } else {
+    } else {
       return Text(text, style: textStyle);
     }
+  }
+}
+
+class _LiveRecordingWaveform extends StatefulWidget {
+  final List<double> heights;
+  final int recordingSeconds;
+  final VoidCallback onCancel;
+  final VoidCallback onSend;
+
+  const _LiveRecordingWaveform({
+    required this.heights,
+    required this.recordingSeconds,
+    required this.onCancel,
+    required this.onSend,
+  });
+
+  @override
+  State<_LiveRecordingWaveform> createState() => _LiveRecordingWaveformState();
+}
+
+class _LiveRecordingWaveformState extends State<_LiveRecordingWaveform>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _animCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Cancel/Delete Button
+        GestureDetector(
+          onTap: widget.onCancel,
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.delete_outline_rounded,
+              color: Colors.redAccent,
+              size: 22,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // Animated Waveform Container
+        Expanded(
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Pulsating Red Recording Dot
+                AnimatedBuilder(
+                  animation: _animCtrl,
+                  builder: (context, _) {
+                    final pulse = (math.sin(_animCtrl.value * 2 * math.pi) + 1) / 2;
+                    return Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.4 + (pulse * 0.6)),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.redAccent.withValues(alpha: 0.3 * pulse),
+                            blurRadius: 6,
+                            spreadRadius: 2 * pulse,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 12),
+
+                // Live Dancing Audio Waveform
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: _animCtrl,
+                    builder: (context, _) {
+                      final anim = _animCtrl.value;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: List.generate(20, (i) {
+                          final base = widget.heights.isNotEmpty
+                              ? widget.heights[i % widget.heights.length]
+                              : 8.0;
+                          final wave = math.sin((i * 0.45) + (anim * 2 * math.pi));
+                          final wave2 = math.cos((i * 0.3) - (anim * 2 * math.pi));
+                          final h = (base * 0.6 + (wave * 8.0) + (wave2 * 5.0) + 10.0)
+                              .clamp(4.0, 30.0);
+                          return Container(
+                            width: 2.8,
+                            height: h,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                              ),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          );
+                        }),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Timer Display
+                Text(
+                  '${widget.recordingSeconds ~/ 60}:${(widget.recordingSeconds % 60).toString().padLeft(2, '0')}',
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // Send Button
+        GestureDetector(
+          onTap: widget.onSend,
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0xFF6366F1),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.arrow_upward_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

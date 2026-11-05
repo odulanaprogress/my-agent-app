@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
 
 import '../providers/auth_provider.dart';
@@ -26,29 +28,40 @@ class AuthGate extends ConsumerWidget {
         );
 
       case AuthStatus.authenticated:
-        final user = ref.watch(currentUserProvider);
-
-        if (user == null) {
+        final firebaseUser = FirebaseAuth.instance.currentUser;
+        if (firebaseUser == null) {
           return const LoginScreen();
         }
 
-        // Prefer the role stored in Firestore.
-        // (Role selection / onboarding fallback should be handled when the user profile is created/updated.)
-        final effectiveRole = user.role.trim().isNotEmpty
-            ? user.role.trim()
-            : 'tenant';
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(firebaseUser.uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final data = snapshot.data?.data();
+            final cachedUser = ref.watch(currentUserProvider);
+            final effectiveRole = (data?['role'] ?? cachedUser?.role ?? 'tenant')
+                .toString()
+                .trim()
+                .toLowerCase();
 
-        switch (effectiveRole) {
-          case 'landlord':
-            return const LandlordDashboardScreen();
-          case 'admin':
-            return const AdminDashboardScreen();
-          case 'customer_support':
-            return const CustomerSupportDashboardScreen();
-          case 'tenant':
-          default:
-            return const TenantDashboardScreen();
-        }
+            switch (effectiveRole) {
+              case 'landlord':
+              case 'agent':
+              case 'broker':
+                return const LandlordDashboardScreen();
+              case 'admin':
+              case 'super_admin':
+                return const AdminDashboardScreen();
+              case 'customer_support':
+                return const CustomerSupportDashboardScreen();
+              case 'tenant':
+              default:
+                return const TenantDashboardScreen();
+            }
+          },
+        );
 
       case AuthStatus.error:
       case AuthStatus.unauthenticated:

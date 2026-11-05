@@ -17,6 +17,7 @@ class CallModel {
   final String receiverName;
   final String? receiverPhoto;
   final CallStatus status;
+  final bool isVideo;
   final DateTime createdAt;
   final DateTime? connectedAt;
   final DateTime? endedAt;
@@ -30,6 +31,7 @@ class CallModel {
     required this.receiverName,
     this.receiverPhoto,
     required this.status,
+    this.isVideo = false,
     required this.createdAt,
     this.connectedAt,
     this.endedAt,
@@ -45,6 +47,7 @@ class CallModel {
       'receiverName': receiverName,
       'receiverPhoto': receiverPhoto,
       'status': status.name,
+      'isVideo': isVideo,
       'createdAt': Timestamp.fromDate(createdAt),
       'connectedAt': connectedAt != null ? Timestamp.fromDate(connectedAt!) : null,
       'endedAt': endedAt != null ? Timestamp.fromDate(endedAt!) : null,
@@ -62,6 +65,7 @@ class CallModel {
       receiverName: data['receiverName'] ?? 'User',
       receiverPhoto: data['receiverPhoto'],
       status: _parseStatus(data['status']),
+      isVideo: data['isVideo'] == true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       connectedAt: (data['connectedAt'] as Timestamp?)?.toDate(),
       endedAt: (data['endedAt'] as Timestamp?)?.toDate(),
