@@ -25,14 +25,24 @@ class WebRTCService {
   final VoidCallback? onConnected;
   final VoidCallback? onDisconnected;
 
-  static const Map<String, dynamic> _iceServers = {
+  static const Map<String, dynamic> _peerConnectionConfig = {
     'iceServers': [
       {'urls': 'stun:stun.l.google.com:19302'},
       {'urls': 'stun:stun1.l.google.com:19302'},
       {'urls': 'stun:stun2.l.google.com:19302'},
       {'urls': 'stun:stun3.l.google.com:19302'},
       {'urls': 'stun:stun4.l.google.com:19302'},
-    ]
+      {'urls': 'stun:stun.cloudflare.com:3478'},
+      {'urls': 'stun:stun.services.mozilla.com'},
+    ],
+    'sdpSemantics': 'unified-plan',
+  };
+
+  static const Map<String, dynamic> _peerConnectionConstraints = {
+    'mandatory': {},
+    'optional': [
+      {'DtlsSrtpKeyAgreement': true},
+    ],
   };
 
   WebRTCService({
@@ -45,7 +55,7 @@ class WebRTCService {
   });
 
   /// Initialize renderers for video AND audio.
-  /// On Web, RTCVideoRenderer attaches the MediaStream to the browser DOM so audio plays out of speakers.
+  /// On Web, RTCVideoRenderer mounts the MediaStream in the browser DOM so audio plays out of speakers.
   Future<void> initializeRenderers() async {
     localRenderer = RTCVideoRenderer();
     remoteRenderer = RTCVideoRenderer();
@@ -74,37 +84,94 @@ class WebRTCService {
             : false,
       };
 
-      _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+      try {
+        _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+      } catch (e) {
+        debugPrint('[WebRTC] getUserMedia failed with constraints, retrying with basic audio: $e');
+        _localStream = await navigator.mediaDevices.getUserMedia({
+          'audio': true,
+          'video': isVideo,
+        });
+      }
 
-      if (localRenderer != null) {
+      // Ensure local audio tracks are active
+      for (final track in _localStream!.getAudioTracks()) {
+        track.enabled = true;
+      }
+
+      if (isVideo && localRenderer != null) {
         localRenderer!.srcObject = _localStream;
       }
 
-      _peerConnection = await createPeerConnection(_iceServers);
+      _peerConnection = await createPeerConnection(
+        _peerConnectionConfig,
+        _peerConnectionConstraints,
+      );
 
       // Add local tracks to peer connection
-      _localStream!.getTracks().forEach((track) {
-        _peerConnection!.addTrack(track, _localStream!);
-      });
+      for (final track in _localStream!.getTracks()) {
+        await _peerConnection!.addTrack(track, _localStream!);
+      }
 
       // Handle remote tracks
-      _peerConnection!.onTrack = (RTCTrackEvent event) {
+      _peerConnection!.onTrack = (RTCTrackEvent event) async {
+        debugPrint('[WebRTC] onTrack: kind=${event.track.kind}, id=${event.track.id}, streams=${event.streams.length}');
         if (event.streams.isNotEmpty) {
           _remoteStream = event.streams[0];
-          if (remoteRenderer != null) {
-            remoteRenderer!.srcObject = _remoteStream;
-          }
-          // Enable all remote audio tracks
-          for (final t in _remoteStream!.getAudioTracks()) {
-            t.enabled = true;
-          }
-          onRemoteStream?.call(_remoteStream!);
+        } else {
+          _remoteStream ??= await createLocalMediaStream('remote_stream_${DateTime.now().millisecondsSinceEpoch}');
+          _remoteStream!.addTrack(event.track);
+        }
+
+        if (remoteRenderer != null) {
+          remoteRenderer!.srcObject = _remoteStream;
+          remoteRenderer!.muted = false;
+          await remoteRenderer!.setVolume(1.0);
+        }
+
+        for (final t in _remoteStream!.getAudioTracks()) {
+          t.enabled = true;
+        }
+
+        onRemoteStream?.call(_remoteStream!);
+      };
+
+      // Fallback for browsers that trigger onAddStream
+      _peerConnection!.onAddStream = (MediaStream stream) async {
+        debugPrint('[WebRTC] onAddStream: id=${stream.id}');
+        _remoteStream = stream;
+        if (remoteRenderer != null) {
+          remoteRenderer!.srcObject = _remoteStream;
+          remoteRenderer!.muted = false;
+          await remoteRenderer!.setVolume(1.0);
+        }
+        for (final t in _remoteStream!.getAudioTracks()) {
+          t.enabled = true;
+        }
+        onRemoteStream?.call(_remoteStream!);
+      };
+
+      _peerConnection!.onIceConnectionState = (RTCIceConnectionState state) {
+        debugPrint('[WebRTC] ICE Connection state: $state');
+        if (state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
+            state == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
+          setSpeakerphoneOn(true);
+          remoteRenderer?.muted = false;
+          remoteRenderer?.setVolume(1.0);
+          onConnected?.call();
+        } else if (state == RTCIceConnectionState.RTCIceConnectionStateFailed ||
+            state == RTCIceConnectionState.RTCIceConnectionStateDisconnected ||
+            state == RTCIceConnectionState.RTCIceConnectionStateClosed) {
+          onDisconnected?.call();
         }
       };
 
       _peerConnection!.onConnectionState = (RTCPeerConnectionState state) {
         debugPrint('[WebRTC] Connection state: $state');
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+          setSpeakerphoneOn(true);
+          remoteRenderer?.muted = false;
+          remoteRenderer?.setVolume(1.0);
           onConnected?.call();
         } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
             state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
@@ -116,6 +183,7 @@ class WebRTCService {
       // Send local ICE candidates to Firestore
       final myCandidatesCollection = isCaller ? 'callerCandidates' : 'receiverCandidates';
       _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) async {
+        if (candidate.candidate == null || candidate.candidate!.trim().isEmpty) return;
         try {
           await FirebaseFirestore.instance
               .collection('calls')
@@ -125,16 +193,22 @@ class WebRTCService {
             'candidate': candidate.candidate,
             'sdpMid': candidate.sdpMid,
             'sdpMLineIndex': candidate.sdpMLineIndex,
+            'createdAt': FieldValue.serverTimestamp(),
           });
         } catch (_) {}
       };
 
+      final offerAnswerConstraints = <String, dynamic>{
+        'mandatory': {
+          'OfferToReceiveAudio': true,
+          'OfferToReceiveVideo': isVideo,
+        },
+        'optional': [],
+      };
+
       if (isCaller) {
         // Create Offer
-        final offer = await _peerConnection!.createOffer({
-          'offerToReceiveAudio': 1,
-          'offerToReceiveVideo': isVideo ? 1 : 0,
-        });
+        final offer = await _peerConnection!.createOffer(offerAnswerConstraints);
         await _peerConnection!.setLocalDescription(offer);
 
         await FirebaseFirestore.instance.collection('calls').doc(callId).set({
@@ -176,10 +250,7 @@ class WebRTCService {
             await _peerConnection?.setRemoteDescription(offer);
             await _drainPendingCandidates();
 
-            final answer = await _peerConnection!.createAnswer({
-              'offerToReceiveAudio': 1,
-              'offerToReceiveVideo': isVideo ? 1 : 0,
-            });
+            final answer = await _peerConnection!.createAnswer(offerAnswerConstraints);
             await _peerConnection!.setLocalDescription(answer);
 
             await FirebaseFirestore.instance.collection('calls').doc(callId).set({
@@ -202,13 +273,21 @@ class WebRTCService {
           if (change.type == DocumentChangeType.added) {
             final data = change.doc.data();
             if (data != null && data['candidate'] != null) {
+              final candStr = data['candidate'] as String?;
+              if (candStr == null || candStr.trim().isEmpty) continue;
+
               final candidate = RTCIceCandidate(
-                data['candidate'],
-                data['sdpMid'],
-                data['sdpMLineIndex'],
+                candStr,
+                data['sdpMid'] as String?,
+                (data['sdpMLineIndex'] as num?)?.toInt(),
               );
+
               if (_hasRemoteDescription && _peerConnection != null) {
-                await _peerConnection?.addCandidate(candidate);
+                try {
+                  await _peerConnection?.addCandidate(candidate);
+                } catch (e) {
+                  debugPrint('[WebRTC] Error adding ICE candidate: $e');
+                }
               } else {
                 _pendingRemoteCandidates.add(candidate);
               }
@@ -222,12 +301,20 @@ class WebRTCService {
   }
 
   Future<void> _drainPendingCandidates() async {
-    for (final candidate in _pendingRemoteCandidates) {
+    for (final candidate in List.from(_pendingRemoteCandidates)) {
       try {
         await _peerConnection?.addCandidate(candidate);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[WebRTC] Error draining pending candidate: $e');
+      }
     }
     _pendingRemoteCandidates.clear();
+  }
+
+  void setSpeakerphoneOn(bool enabled) {
+    try {
+      Helper.setSpeakerphoneOn(enabled);
+    } catch (_) {}
   }
 
   void toggleMute(bool muted) {

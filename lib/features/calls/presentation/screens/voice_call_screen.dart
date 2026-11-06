@@ -5,6 +5,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:agent_app/features/calls/models/call_model.dart';
 import 'package:agent_app/features/calls/services/call_service.dart';
 import 'package:agent_app/core/services/call_ringtone_service.dart';
+import 'package:agent_app/core/services/permission_service.dart';
 import 'package:agent_app/features/calls/services/webrtc_service.dart';
 
 class VoiceCallScreen extends StatefulWidget {
@@ -40,7 +41,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   Timer? _ringTimeoutTimer;
   int _callDurationSeconds = 0;
   bool _isMuted = false;
-  bool _isSpeaker = false;
+  bool _isSpeaker = true;
 
   @override
   void initState() {
@@ -148,11 +149,19 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       callId: widget.callId,
       isCaller: isCaller,
       isVideo: false,
+      onRemoteStream: (stream) {
+        debugPrint('[VoiceCallScreen] Remote audio stream received!');
+        if (mounted) setState(() {});
+      },
       onConnected: () {
         debugPrint('[VoiceCallScreen] WebRTC audio connected!');
+        _webrtcService?.setSpeakerphoneOn(_isSpeaker);
+        if (mounted) setState(() {});
       },
     );
     await _webrtcService!.start();
+    _webrtcService?.setSpeakerphoneOn(_isSpeaker);
+    if (mounted) setState(() {});
   }
 
   Future<void> _endCall() async {
@@ -162,6 +171,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   Future<void> _acceptCall() async {
     CallRingtoneService.stop();
+    await PermissionService.requestMicrophonePermission(context);
     await CallService.acceptCall(widget.callId);
     await _startWebRTC(isCaller: false);
     if (mounted) {
@@ -223,14 +233,20 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       body: SafeArea(
         child: Stack(
           children: [
-            // Hidden audio pipeline element so WebRTC audio attaches to DOM in Flutter Web
+            // Active audio element in DOM so WebRTC audio plays out of device speakers
             if (_webrtcService?.remoteRenderer != null)
-              Offstage(
-                offstage: true,
-                child: SizedBox(
-                  width: 1,
-                  height: 1,
-                  child: RTCVideoView(_webrtcService!.remoteRenderer!),
+              Positioned(
+                top: 0,
+                left: 0,
+                width: 4,
+                height: 4,
+                child: Opacity(
+                  opacity: 0.01,
+                  child: RTCVideoView(
+                    _webrtcService!.remoteRenderer!,
+                    mirror: false,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                  ),
                 ),
               ),
             Column(
@@ -521,6 +537,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
             GestureDetector(
               onTap: () {
                 setState(() => _isSpeaker = !_isSpeaker);
+                _webrtcService?.setSpeakerphoneOn(_isSpeaker);
               },
               child: Container(
                 width: 58,

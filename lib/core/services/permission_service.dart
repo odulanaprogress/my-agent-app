@@ -47,6 +47,17 @@ class PermissionService {
     return result.isGranted;
   }
 
+  static Future<bool> requestMicrophonePermission(BuildContext context) async {
+    try {
+      final status = await Permission.microphone.status;
+      if (status.isGranted) return true;
+      final result = await Permission.microphone.request();
+      return result.isGranted;
+    } catch (_) {
+      return true; // Web or unsupported platforms default to browser prompt
+    }
+  }
+
   static Future<bool> requestStoragePermission(BuildContext context) async {
     final status = await Permission.storage.status;
     if (status.isGranted) return true;

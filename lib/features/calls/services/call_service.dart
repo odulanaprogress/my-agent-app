@@ -6,6 +6,7 @@ import 'package:agent_app/features/calls/models/call_model.dart';
 import 'package:agent_app/features/calls/presentation/screens/voice_call_screen.dart';
 import 'package:agent_app/features/calls/presentation/screens/video_call_screen.dart';
 import 'package:agent_app/core/services/onesignal_api_service.dart';
+import 'package:agent_app/core/services/permission_service.dart';
 import 'package:agent_app/app/routes/app_router.dart';
 
 class CallService {
@@ -100,6 +101,8 @@ class CallService {
       return;
     }
 
+    await PermissionService.requestMicrophonePermission(context);
+
     try {
       final callDoc = _firestore.collection('calls').doc();
       final callId = callDoc.id;
@@ -174,6 +177,8 @@ class CallService {
       );
       return;
     }
+
+    await PermissionService.requestMicrophonePermission(context);
 
     try {
       final callDoc = _firestore.collection('calls').doc();

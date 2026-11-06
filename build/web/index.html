@@ -116,6 +116,76 @@
       });
     }
   </script>
+    <script>
+    // WebRTC Audio Autoplay & Unmute Guardian
+    // Guarantees all remote audio tracks created by flutter_webrtc are unmuted, visible to Chrome's audio pipeline, and playing immediately.
+    (function() {
+      function unlockWebRTCAudio() {
+        var mgr = document.getElementById('html_webrtc_audio_manager_list');
+        if (mgr) {
+          mgr.style.display = 'block';
+          mgr.style.position = 'fixed';
+          mgr.style.top = '-9999px';
+          mgr.style.left = '-9999px';
+          mgr.style.width = '1px';
+          mgr.style.height = '1px';
+          mgr.style.opacity = '0.01';
+          mgr.style.pointerEvents = 'none';
+        }
+
+        var audios = document.querySelectorAll('audio');
+        for (var i = 0; i < audios.length; i++) {
+          var a = audios[i];
+          a.muted = false;
+          a.volume = 1.0;
+          a.setAttribute('playsinline', 'true');
+          a.setAttribute('webkit-playsinline', 'true');
+          if (a.paused && a.srcObject) {
+            var p = a.play();
+            if (p && typeof p.catch === 'function') {
+              p.catch(function() {});
+            }
+          }
+        }
+
+        var videos = document.querySelectorAll('video');
+        for (var j = 0; j < videos.length; j++) {
+          var v = videos[j];
+          v.setAttribute('playsinline', 'true');
+          v.setAttribute('webkit-playsinline', 'true');
+          if (v.paused && v.srcObject) {
+            var vp = v.play();
+            if (vp && typeof vp.catch === 'function') {
+              vp.catch(function() {});
+            }
+          }
+        }
+      }
+
+      window.unmuteWebRTC = unlockWebRTCAudio;
+
+      var observer = new MutationObserver(function() {
+        unlockWebRTCAudio();
+      });
+
+      if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          observer.observe(document.body, { childList: true, subtree: true });
+        });
+      }
+
+      var userEvents = ['click', 'touchstart', 'touchend'];
+      for (var k = 0; k < userEvents.length; k++) {
+        window.addEventListener(userEvents[k], function() {
+          unlockWebRTCAudio();
+        }, { passive: true });
+      }
+
+      setInterval(unlockWebRTCAudio, 1000);
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

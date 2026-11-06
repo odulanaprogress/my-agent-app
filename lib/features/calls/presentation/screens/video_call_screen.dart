@@ -221,6 +221,22 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       backgroundColor: const Color(0xFF0F172A),
       body: Stack(
         children: [
+          // Audio pipeline anchor in DOM so WebRTC audio plays even when video is loading
+          if (_webrtcService?.remoteRenderer != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              width: 2,
+              height: 2,
+              child: Opacity(
+                opacity: 0.01,
+                child: RTCVideoView(
+                  _webrtcService!.remoteRenderer!,
+                  mirror: false,
+                ),
+              ),
+            ),
+
           // ── Remote Video Stream (Full Screen) ──
           Positioned.fill(
             child: (isConnected && _webrtcService?.remoteRenderer != null && _hasRemoteVideo)
@@ -418,3 +434,4 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 }
+
