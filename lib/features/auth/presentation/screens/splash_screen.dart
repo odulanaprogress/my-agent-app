@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:agent_app/core/widgets/app_loader.dart';
 
 import '../../../onboarding/presentation/screens/onboarding_screen.dart';
 
@@ -46,40 +45,39 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ScaleTransition(
               scale: _scaleAnimation,
-              child: Image.asset('assets/logos/agent_logo.png', height: 120, errorBuilder: (context, error, stackTrace) {
-                // Fallback if logo path is wrong
-                return Image.asset('assets/images/agent_logo.png', height: 120);
-              }),
-            ),
-            const SizedBox(height: 30),
-            const Text(
-              'AGENT',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 3,
+              child: Image.asset(
+                'assets/logos/agent_logo.png',
+                height: 80,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             const Text(
               'Beyond Housing',
               style: TextStyle(
-                color: Colors.white70,
-                fontSize: 16,
-                letterSpacing: 1.2,
-                fontWeight: FontWeight.w500,
+                color: Color(0xFF64748B),
+                fontSize: 15,
+                letterSpacing: 0.8,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 50),
-            const AppLoader(size: 56),
+            const SizedBox(height: 36),
+            const SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4A43EB)),
+              ),
+            ),
           ],
         ),
       ),

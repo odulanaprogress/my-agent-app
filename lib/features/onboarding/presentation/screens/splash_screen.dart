@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../app/theme/text_styles.dart';
 import '../../../../core/constants/storage_keys.dart';
-import 'package:agent_app/core/widgets/app_loader.dart';
 
 
 class SplashScreen extends StatefulWidget {
@@ -57,24 +55,29 @@ class _SplashScreenState extends State<SplashScreen> {
           children: [
             Image.asset(
               'assets/logos/agent_logo.png',
-              width: 140,
+              height: 80,
+              fit: BoxFit.contain,
               errorBuilder: (_, a, b) => const SizedBox.shrink(),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'AGENT',
-              style: AppTextStyles.heading1.copyWith(color: Colors.white),
-            ),
-            const SizedBox(height: 12),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               'Beyond Housing',
-              style: AppTextStyles.body.copyWith(
-                color: Colors.white70,
-                letterSpacing: 0.5,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+                letterSpacing: 0.8,
               ),
             ),
-            const SizedBox(height: 40),
-            AppLoader(size: 24),
+            const SizedBox(height: 36),
+            const SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4A43EB)),
+              ),
+            ),
           ],
         ),
       ),

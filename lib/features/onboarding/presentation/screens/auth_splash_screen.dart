@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shimmer/shimmer.dart';
 
 import '../providers/onboarding_provider.dart';
 import '../providers/privacy_provider.dart';
@@ -87,33 +86,32 @@ class _AuthSplashScreenState extends ConsumerState<AuthSplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo
-            Image.asset(
-              'assets/logos/agent_logo.png',
-              height: 120,
-              width: 120,
-            ),
-            const SizedBox(height: 24),
-            // App name
-            Shimmer.fromColors(
-              baseColor: const Color(0xFF0F172A),
-              highlightColor: Colors.grey.shade400,
-              child: const Text(
-                'AGENT',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+            // Blue Logo
+            Hero(
+              tag: 'app_logo',
+              child: Image.asset(
+                'assets/logos/agent_logo.png',
+                height: 80,
+                fit: BoxFit.contain,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             const Text(
               'Beyond Housing',
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 color: Color(0xFF64748B),
-                letterSpacing: 0.5,
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(height: 36),
+            const SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4A43EB)),
               ),
             ),
           ],

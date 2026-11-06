@@ -6,7 +6,6 @@ import '../providers/onboarding_provider.dart';
 import '../providers/privacy_provider.dart';
 import '../providers/startup_provider.dart';
 import '../../../../app/routes/route_names.dart';
-import 'package:agent_app/core/widgets/app_loader.dart';
 
 
 /// App entry controller.
@@ -81,32 +80,30 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
           children: [
             Image.asset(
               'assets/logos/agent_logo.png',
-              width: 140,
+              height: 80,
+              fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'AGENT',
-              style: TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0B3D2E),
-              ),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             const Text(
               'Beyond Housing',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF0B3D2E),
-                height: 1.4,
-                letterSpacing: 0.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+                letterSpacing: 0.8,
               ),
             ),
-            const SizedBox(height: 40),
-            AppLoader(size: 24),
+            const SizedBox(height: 36),
+            const SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4A43EB)),
+              ),
+            ),
           ],
         ),
       ),
