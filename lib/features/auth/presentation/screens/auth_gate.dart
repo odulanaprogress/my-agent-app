@@ -11,8 +11,9 @@ import '../../../dashboard/presentation/screens/tenant_dashboard_screen.dart';
 import '../../../dashboard/presentation/screens/landlord_dashboard_screen.dart';
 import '../../../dashboard/presentation/screens/admin_dashboard_screen.dart';
 import '../../../admin/screens/customer_support_dashboard_screen.dart';
-
+import 'role_selection_screen.dart';
 import 'login_screen.dart';
+
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
@@ -23,7 +24,7 @@ class AuthGate extends ConsumerWidget {
     switch (authState.status) {
       case AuthStatus.loading:
         return const Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: Color(0xFF0F172A),
           body: Center(child: AppLoader(size: 64)),
         );
 
@@ -41,10 +42,26 @@ class AuthGate extends ConsumerWidget {
           builder: (context, snapshot) {
             final data = snapshot.data?.data();
             final cachedUser = ref.watch(currentUserProvider);
-            final effectiveRole = (data?['role'] ?? cachedUser?.role ?? 'tenant')
-                .toString()
-                .trim()
-                .toLowerCase();
+
+            // Determine role with strict prioritization:
+            // 1. Live Firestore snapshot
+            // 2. Verified cached user from provider
+            final rawRole = data?['role'] ?? cachedUser?.role;
+
+            // PREVENT FLASHING: While Firestore is fetching and no cached role is present,
+            // render a clean dark branded loading screen. NEVER fall back to TenantDashboardScreen!
+            if (rawRole == null) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  backgroundColor: Color(0xFF0F172A),
+                  body: Center(child: AppLoader(size: 64)),
+                );
+              }
+              // If Firestore finished loading and user has no role assigned:
+              return const RoleSelectionScreen();
+            }
+
+            final effectiveRole = rawRole.toString().trim().toLowerCase();
 
             switch (effectiveRole) {
               case 'landlord':
@@ -57,8 +74,9 @@ class AuthGate extends ConsumerWidget {
               case 'customer_support':
                 return const CustomerSupportDashboardScreen();
               case 'tenant':
-              default:
                 return const TenantDashboardScreen();
+              default:
+                return const RoleSelectionScreen();
             }
           },
         );

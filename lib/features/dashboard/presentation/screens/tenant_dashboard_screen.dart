@@ -1,599 +1,1221 @@
 import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:go_router/go_router.dart';
+import '../../../auth/presentation/providers/current_user_provider.dart';
+
+
 
 import '../widgets/dashboard_header.dart';
+
 import '../widgets/category_section.dart';
+
 import '../widgets/promotion_banner_carousel.dart';
+
 import '../widgets/featured_property_section.dart';
+
 import '../widgets/dashboard_bottom_nav.dart';
+
 import '../../../../features/support/support_inquiry_screen.dart';
+
 import '../../../../core/services/user_behavior_service.dart';
+
 import '../../../../features/ai/screens/ai_chat_screen.dart';
+
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../../core/widgets/biometric_registration_prompt.dart';
 
+
+
 class TenantDashboardScreen extends ConsumerStatefulWidget {
+
   const TenantDashboardScreen({super.key});
 
+
+
   @override
+
   ConsumerState<TenantDashboardScreen> createState() =>
+
       _TenantDashboardScreenState();
+
 }
+
+
+
 
 
 class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
+
   int currentIndex = 0;
+
   String searchQuery = '';
+
   String? selectedCategory;
 
+
+
   TutorialCoachMark? tutorialCoachMark;
+
   final GlobalKey _aiChatKey = GlobalKey();
+
   final GlobalKey _supportKey = GlobalKey();
+
   final GlobalKey _searchKey = GlobalKey();
+
   final GlobalKey _quickActionsKey = GlobalKey();
 
+
+
   @override
+
   void initState() {
+
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+
+      final user = ref.read(currentUserProvider);
+
+      if (user != null) {
+
+        final role = user.role.toLowerCase().trim();
+
+        if (role == 'landlord' || role == 'agent' || role == 'broker') {
+
+          if (mounted) context.go('/landlord');
+
+          return;
+
+        } else if (role == 'admin' || role == 'super_admin') {
+
+          if (mounted) context.go('/admin');
+
+          return;
+
+        }
+
+      }
+
       UserBehaviorService.logLogin();
+
       _checkAndShowTour();
+
       _checkJustRegistered();
+
     });
+
   }
+
+
 
   Future<void> _checkJustRegistered() async {
+
     if (kIsWeb) return; // Biometrics are mobile-only
+
     final prefs = await SharedPreferences.getInstance();
+
     final justRegistered = prefs.getBool('just_registered') ?? false;
+
     final justLoggedIn = prefs.getBool('just_logged_in') ?? false;
+
     if (justRegistered) {
+
       await prefs.setBool('just_registered', false);
+
       if (mounted) {
+
         await showBiometricRegistrationPromptIfNeeded(context);
+
       }
+
     } else if (justLoggedIn) {
+
       await prefs.setBool('just_logged_in', false);
+
       if (mounted) {
+
         ScaffoldMessenger.of(context).showSnackBar(
+
           const SnackBar(
+
             content: Row(
+
               children: [
+
                 Icon(Icons.check_circle_outline_rounded, color: Colors.white),
+
                 SizedBox(width: 8),
+
                 Text('Login successful. Welcome back!', style: TextStyle(fontWeight: FontWeight.bold)),
+
               ],
+
             ),
+
             backgroundColor: Color(0xFF10B981),
+
             behavior: SnackBarBehavior.floating,
+
           ),
+
         );
+
         await showBiometricRegistrationPromptIfNeeded(context);
+
       }
+
     }
+
   }
+
+
 
   Future<void> _checkAndShowTour() async {
+
     final prefs = await SharedPreferences.getInstance();
+
     final hasSeenTour = prefs.getBool('has_seen_tour_tenant') ?? false;
+
     
+
     if (!hasSeenTour && mounted) {
+
       _showTour();
+
       await prefs.setBool('has_seen_tour_tenant', true);
+
     }
+
   }
+
+
 
   void _showTour() {
+
     tutorialCoachMark = TutorialCoachMark(
+
       targets: _createTargets(),
+
       colorShadow: const Color(0xFF0F172A),
+
       textSkip: "SKIP",
+
       paddingFocus: 10,
+
       opacityShadow: 0.8,
+
       onFinish: () {},
+
       onClickTarget: (target) {},
+
       onClickTargetWithTapPosition: (target, tapDetails) {},
+
       onClickOverlay: (target) {},
+
       onSkip: () => true,
+
     )..show(context: context);
+
   }
 
+
+
   List<TargetFocus> _createTargets() {
+
     return [
+
       TargetFocus(
+
         identify: "searchKey",
+
         keyTarget: _searchKey,
+
         alignSkip: Alignment.topRight,
+
         contents: [
+
           TargetContent(
+
             align: ContentAlign.bottom,
+
             builder: (context, controller) {
+
               return const Column(
+
                 mainAxisSize: MainAxisSize.min,
+
                 crossAxisAlignment: CrossAxisAlignment.start,
+
                 children: [
+
                   Text(
+
                     "Search Properties",
+
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+
                   ),
+
                   SizedBox(height: 10),
+
                   Text(
+
                     "Find your dream home by searching through our premium listings.",
+
                     style: TextStyle(color: Colors.white),
+
                   ),
+
                 ],
+
               );
+
             },
+
           ),
+
         ],
+
       ),
+
       TargetFocus(
+
         identify: "quickActionsKey",
+
         keyTarget: _quickActionsKey,
+
         alignSkip: Alignment.topRight,
+
         contents: [
+
           TargetContent(
+
             align: ContentAlign.bottom,
+
             builder: (context, controller) {
+
               return const Column(
+
                 mainAxisSize: MainAxisSize.min,
+
                 crossAxisAlignment: CrossAxisAlignment.start,
+
                 children: [
+
                   Text(
+
                     "Quick Actions",
+
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+
                   ),
+
                   SizedBox(height: 10),
+
                   Text(
+
                     "Access your wallet, rentals, verification, and saved properties quickly.",
+
                     style: TextStyle(color: Colors.white),
+
                   ),
+
                 ],
+
               );
+
             },
+
           ),
+
         ],
+
       ),
+
       TargetFocus(
+
         identify: "aiChatKey",
+
         keyTarget: _aiChatKey,
+
         shape: ShapeLightFocus.Circle,
+
         alignSkip: Alignment.topLeft,
+
         contents: [
+
           TargetContent(
+
             align: ContentAlign.top,
+
             builder: (context, controller) {
+
               return const Column(
+
                 mainAxisSize: MainAxisSize.min,
+
                 crossAxisAlignment: CrossAxisAlignment.start,
+
                 children: [
+
                   Text(
+
                     "AI Assistant",
+
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+
                   ),
+
                   SizedBox(height: 10),
+
                   Text(
+
                     "Need help finding a property? Chat with our smart AI assistant anytime.",
+
                     style: TextStyle(color: Colors.white),
+
                   ),
+
                 ],
+
               );
+
             },
+
           ),
+
         ],
+
       ),
+
       TargetFocus(
+
         identify: "supportKey",
+
         keyTarget: _supportKey,
+
         shape: ShapeLightFocus.RRect,
+
         alignSkip: Alignment.topLeft,
+
         contents: [
+
           TargetContent(
+
             align: ContentAlign.top,
+
             builder: (context, controller) {
+
               return const Column(
+
                 mainAxisSize: MainAxisSize.min,
+
                 crossAxisAlignment: CrossAxisAlignment.start,
+
                 children: [
+
                   Text(
+
                     "Customer Support",
+
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+
                   ),
+
                   SizedBox(height: 10),
+
                   Text(
+
                     "Have an issue? Open a ticket or chat with our live support agents.",
+
                     style: TextStyle(color: Colors.white),
+
                   ),
+
                 ],
+
               );
+
             },
+
           ),
+
         ],
+
       ),
+
     ];
+
   }
+
+
+
 
 
   @override
+
   Widget build(BuildContext context) {
+
     return Scaffold(
+
       backgroundColor: const Color(0xFFF8FAFC),
+
       floatingActionButton: Column(
+
         mainAxisSize: MainAxisSize.min,
+
         crossAxisAlignment: CrossAxisAlignment.end,
+
         children: [
+
           FloatingActionButton.small(
+
             key: _aiChatKey,
+
             heroTag: 'ai_chat',
+
             onPressed: () => Navigator.push(
+
               context,
+
               MaterialPageRoute(builder: (_) => const AIChatScreen()),
+
             ),
+
             backgroundColor: const Color(0xFF0F172A),
+
             tooltip: 'AI Assistant',
+
             child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 20),
+
           ),
+
           const SizedBox(height: 10),
+
           FloatingActionButton.extended(
+
             key: _supportKey,
+
             heroTag: 'support',
+
             onPressed: () => Navigator.push(
+
               context,
+
               MaterialPageRoute(builder: (_) => const SupportInquiryScreen()),
+
             ),
+
             backgroundColor: const Color(0xFF6366F1),
+
             icon: const Icon(Icons.support_agent_rounded, color: Colors.white),
+
             label: const Text(
+
               'Support',
+
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+
             ),
+
             tooltip: 'Contact Support / Make Inquiry',
+
           ),
+
         ],
+
       ),
+
       body: SafeArea(
+
         child: RefreshIndicator(
+
           onRefresh: () async {
+
             await Future<void>.delayed(const Duration(milliseconds: 300));
+
             setState(() {});
+
           },
+
           child: SingleChildScrollView(
+
             physics: const AlwaysScrollableScrollPhysics(),
+
             padding: const EdgeInsets.symmetric(horizontal: 20),
+
             child: Column(
+
               crossAxisAlignment: CrossAxisAlignment.start,
+
               children: [
+
                 const SizedBox(height: 14),
+
                 const DashboardHeader(),
+
                 const SizedBox(height: 16),
+
+
 
                 // Search field with compact premium container styling
+
                 Container(
+
                   key: _searchKey,
+
                   padding: const EdgeInsets.symmetric(horizontal: 16),
+
                   height: 50,
+
                   decoration: BoxDecoration(
+
                     color: Colors.white,
+
                     borderRadius: BorderRadius.circular(16),
+
                     border: Border.all(color: Colors.grey.shade100, width: 1.5),
+
                     boxShadow: [
+
                       BoxShadow(
+
                         color: Colors.black.withValues(alpha: 0.03),
+
                         blurRadius: 10,
+
                         offset: const Offset(0, 4),
+
                       ),
+
                     ],
+
                   ),
+
                   child: TextField(
+
                     onChanged: (val) {
+
                       setState(() {
+
                         searchQuery = val.trim().toLowerCase();
+
                       });
+
                     },
+
                     decoration: InputDecoration(
+
                       hintText: 'Search premium listings...',
+
                       hintStyle: TextStyle(
+
                         color: Colors.grey.shade400,
+
                         fontSize: 13,
+
                       ),
+
                       border: InputBorder.none,
+
                       icon: const Icon(
+
                         Icons.search_rounded,
+
                         color: Color(0xFF0F172A),
+
                         size: 20,
+
                       ),
+
                       suffixIcon: IconButton(
+
                         onPressed: () {},
+
                         icon: const Icon(
+
                           Icons.tune_rounded,
+
                           color: Color(0xFF0F172A),
+
                           size: 18,
+
                         ),
+
                       ),
+
                     ),
+
                   ),
+
                 ),
+
                 const SizedBox(height: 12),
+
+
 
                 // Auto-sliding 3-second promotion & updates banner
+
                 const PromotionBannerCarousel(),
+
                 const SizedBox(height: 12),
 
+
+
                 // Category section
+
                 CategorySection(
+
                   onCategorySelected: (cat) {
+
                     setState(() {
+
                       selectedCategory = cat;
+
                     });
+
                   },
+
                 ),
+
                 const SizedBox(height: 16),
 
+
+
                 // ── Quick Actions Grid ─────────────────────────────
+
                 Container(
+
                   key: _quickActionsKey,
+
                   child: Column(
+
                     crossAxisAlignment: CrossAxisAlignment.start,
+
                     children: [
+
                       const Padding(
+
                         padding: EdgeInsets.only(left: 2, bottom: 10),
+
                         child: Text(
+
                           'Quick Actions',
+
                           style: TextStyle(
+
                             fontSize: 16,
+
                             fontWeight: FontWeight.w800,
+
                             color: Color(0xFF0F172A),
+
                           ),
+
                         ),
+
                       ),
+
                       _buildQuickActions(),
+
                     ],
+
                   ),
+
                 ),
+
                 const SizedBox(height: 14),
 
+
+
                 const Padding(
+
                   padding: EdgeInsets.only(left: 2),
+
                   child: Text(
+
                     'Featured Properties',
+
                     style: TextStyle(
+
                       fontSize: 18,
+
                       fontWeight: FontWeight.w800,
+
                       color: Color(0xFF0F172A),
+
                     ),
+
                   ),
+
                 ),
+
                 const SizedBox(height: 8),
 
+
+
                 FeaturedPropertySection(
+
                   searchQuery: searchQuery,
+
                   category: selectedCategory,
+
                 ),
+
                 const SizedBox(height: 20),
+
               ],
+
             ),
+
           ),
+
         ),
+
       ),
+
       bottomNavigationBar: DashboardBottomNav(
+
         currentIndex: currentIndex,
+
         onTap: (index) {
+
           setState(() => currentIndex = index);
+
           
+
           switch (index) {
+
             case 0:
+
               break;
+
             case 1:
+
               context.push('/search/favorites');
+
               break;
+
             case 2:
+
               context.push('/conversations');
+
               break;
+
             case 3:
+
               context.push('/profile');
+
               break;
+
           }
+
         },
+
       ),
+
     );
+
   }
+
+
 
   Widget _buildQuickActions() {
+
     final actions = [
+
       _QuickAction(
+
         icon: Icons.account_balance_wallet_rounded,
+
         label: 'My Wallet',
+
         color: const Color(0xFF6366F1),
+
         onTap: () => context.push('/wallet'),
+
       ),
+
       _QuickAction(
+
         icon: Icons.home_work_rounded,
+
         label: 'My Rentals',
+
         color: const Color(0xFF10B981),
+
         onTap: () => context.push('/my-rentals'),
+
       ),
+
       _QuickAction(
+
         icon: Icons.draw_rounded,
+
         label: 'Agreements',
+
         color: const Color(0xFF0F172A),
+
         onTap: () => context.push('/my-rentals'),
+
       ),
+
       _QuickAction(
+
         icon: Icons.verified_user_rounded,
+
         label: 'Verify ID',
+
         color: const Color(0xFFF59E0B),
+
         onTap: () => context.push('/verification'),
+
       ),
+
       _QuickAction(
+
         icon: Icons.search_rounded,
+
         label: 'Search',
+
         color: const Color(0xFF0EA5E9),
+
         onTap: () => context.push('/search'),
+
       ),
+
       _QuickAction(
+
         icon: Icons.favorite_rounded,
+
         label: 'Saved',
+
         color: const Color(0xFFEF4444),
+
         onTap: () => context.push('/search/favorites'),
+
       ),
+
       _QuickAction(
+
         icon: Icons.chat_bubble_rounded,
+
         label: 'Messages',
+
         color: const Color(0xFF8B5CF6),
+
         onTap: () => context.push('/conversations'),
+
       ),
+
       _QuickAction(
+
         icon: Icons.help_outline_rounded,
+
         label: 'Help Guide',
+
         color: const Color(0xFF64748B),
+
         onTap: () => _showHelpSheet(),
+
       ),
+
     ];
 
+
+
     return GridView.builder(
+
       shrinkWrap: true,
+
       physics: const NeverScrollableScrollPhysics(),
+
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+
         crossAxisCount: 4,
+
         childAspectRatio: 0.88,
+
         crossAxisSpacing: 8,
+
         mainAxisSpacing: 10,
+
       ),
+
       itemCount: actions.length,
+
       itemBuilder: (_, i) {
+
         final a = actions[i];
+
         return GestureDetector(
+
           onTap: a.onTap,
+
           child: Container(
+
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+
             decoration: BoxDecoration(
+
               color: Colors.white,
+
               borderRadius: BorderRadius.circular(14),
+
               border: Border.all(color: Colors.grey.shade100, width: 1.5),
+
               boxShadow: [
+
                 BoxShadow(
+
                   color: Colors.black.withValues(alpha: 0.025),
+
                   blurRadius: 6,
+
                   offset: const Offset(0, 2),
+
                 ),
+
               ],
+
             ),
+
             child: Column(
+
               mainAxisAlignment: MainAxisAlignment.center,
+
               children: [
+
                 Container(
+
                   width: 34,
+
                   height: 34,
+
                   decoration: BoxDecoration(
+
                     color: a.color.withValues(alpha: 0.1),
+
                     shape: BoxShape.circle,
+
                   ),
+
                   child: Icon(a.icon, color: a.color, size: 18),
+
                 ),
+
                 const SizedBox(height: 6),
+
                 Text(
+
                   a.label,
+
                   maxLines: 1,
+
                   overflow: TextOverflow.ellipsis,
+
                   style: const TextStyle(
+
                     fontSize: 10,
+
                     fontWeight: FontWeight.w700,
+
                     color: Color(0xFF0F172A),
+
                   ),
+
                   textAlign: TextAlign.center,
+
                 ),
+
               ],
+
             ),
+
           ),
+
         );
+
       },
+
     );
+
   }
+
   void _showHelpSheet() {
+
     showModalBottomSheet(
+
       context: context,
+
       isScrollControlled: true,
+
       backgroundColor: Colors.transparent,
+
       builder: (_) => Container(
+
         decoration: const BoxDecoration(
+
           color: Color(0xFF0F172A),
+
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+
         ),
+
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+
         child: Column(
+
           mainAxisSize: MainAxisSize.min,
+
           crossAxisAlignment: CrossAxisAlignment.start,
+
           children: [
+
             Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+
             const SizedBox(height: 20),
+
             Row(
+
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
               children: [
+
                 const Text('Tenant App Guide', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+
                 TextButton.icon(
+
                   onPressed: () {
+
                     Navigator.pop(context);
+
                     _showTour();
+
                   },
+
                   icon: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 18),
+
                   label: const Text('Start Tour', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+
                   style: TextButton.styleFrom(
+
                     backgroundColor: const Color(0xFF6366F1),
+
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+
                   ),
+
                 ),
+
               ],
+
             ),
+
             const SizedBox(height: 16),
+
             ..._tenantHelpItems.map((item) => Padding(
+
               padding: const EdgeInsets.only(bottom: 14),
+
               child: Row(
+
                 crossAxisAlignment: CrossAxisAlignment.start,
+
                 children: [
+
                   Container(width: 36, height: 36, decoration: BoxDecoration(color: item.$3.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(item.$1, color: item.$3, size: 18)),
+
                   const SizedBox(width: 14),
+
                   Expanded(child: Column(
+
                     crossAxisAlignment: CrossAxisAlignment.start,
+
                     children: [
+
                       Text(item.$2, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+
                       const SizedBox(height: 2),
+
                       Text(item.$4, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12, height: 1.4)),
+
                     ],
+
                   )),
+
                 ],
+
               ),
+
             )),
+
           ],
+
         ),
+
       ),
+
     );
+
   }
+
 }
+
+
 
 const _tenantHelpItems = [
+
   (Icons.search_rounded, 'Search Properties', Color(0xFF6366F1), 'Browse and filter thousands of verified property listings by location, price, and type.'),
+
   (Icons.favorite_outlined, 'Save Favourites', Color(0xFFEF4444), 'Tap the heart icon on any property to save it to your Saved list.'),
+
   (Icons.account_balance_wallet_outlined, 'Wallet & Payments', Color(0xFF10B981), 'Top up your wallet and pay rent securely through our escrow system.'),
+
   (Icons.verified_user_outlined, 'KYC Verification', Color(0xFFF59E0B), 'Complete identity verification to unlock payments and rental agreements.'),
+
   (Icons.chat_bubble_outline, 'Message Landlords', Color(0xFF0EA5E9), 'Directly message property owners from any listing page.'),
+
   (Icons.smart_toy_rounded, 'AI Assistant', Color(0xFF8B5CF6), 'Get instant answers about properties, pricing, and the rental process.'),
+
   (Icons.draw_rounded, 'Tenancy Agreement', Color(0xFF0F172A), 'Sign your digital rental agreement safely within the app.'),
+
   (Icons.support_agent_rounded, 'Customer Support', Color(0xFF64748B), 'Raise tickets or chat with our live support team anytime.'),
+
 ];
 
+
+
 class _QuickAction {
+
   final IconData icon;
+
   final String label;
+
   final Color color;
+
   final VoidCallback onTap;
+
   const _QuickAction({
+
     required this.icon,
+
     required this.label,
+
     required this.color,
+
     required this.onTap,
+
   });
+
 }
+
