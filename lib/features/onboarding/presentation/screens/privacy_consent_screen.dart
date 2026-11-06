@@ -262,7 +262,7 @@ class _PrivacyConsentScreenState
                         '• Right to Object — Object to processing based on legitimate interests.\n'
                         '• Right to Restrict Processing — Request we pause processing under certain conditions.\n'
                         '• Right to Withdraw Consent — Withdraw consent at any time; this will not affect prior lawful processing.\n\n'
-                        'To exercise any of these rights, contact us at: dpo@agentplatform.ng\n'
+                        'To exercise any of these rights, contact us at: agentcustomercare@gmail.com or admin@agentmobiletech.com (Tel: 08107416745, 08131154171)\n'
                         'We will respond within 30 days as required by NDPR.',
                   ),
 
@@ -271,7 +271,7 @@ class _PrivacyConsentScreenState
                     title: '8. Children\'s Privacy (COPPA / NDPR)',
                     body:
                         'Agent Platform is NOT intended for use by persons under the age of 18.\n\n'
-                        'We do not knowingly collect personal data from minors. If you believe a child has provided us with data, please contact dpo@agentplatform.ng immediately and we will delete it within 72 hours.',
+                        'We do not knowingly collect personal data from minors. If you believe a child has provided us with data, please contact agentcustomercare@gmail.com (Tel: 08107416745, 08131154171) immediately and we will delete it within 72 hours.',
                   ),
 
                   _section(
@@ -310,10 +310,12 @@ class _PrivacyConsentScreenState
                     icon: Icons.contact_mail_outlined,
                     title: '12. Contact Us',
                     body:
-                        'For privacy inquiries, data requests, or complaints:\n\n'
-                        '📧 DPO Email: admin@agentmobiletech.com\n'
-                        '📧 Support: customercare@agentmobiletech.com\n'
-                        '🏢 Agent Platform Ltd, Lagos, Nigeria\n\n'
+                        'For customer care, privacy inquiries, or data requests:\n\n'
+                        '📞 Telephone: 08107416745, 08131154171\n'
+                        '📧 Customer Care: agentcustomercare@gmail.com\n'
+                        '📧 Admin Support: agentadminsupport@gmail.com\n'
+                        '📧 DPO / Legal: admin@agentmobiletech.com\n'
+                        '🏢 Office Address: Agent Platform Ltd, Lagos, Nigeria\n\n'
                         'If you are dissatisfied with our response, you may lodge a complaint with the National Information Technology Development Agency (NITDA) — Nigeria\'s data protection authority — at www.nitda.gov.ng.',
                   ),
 

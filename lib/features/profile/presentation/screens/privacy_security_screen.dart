@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/widgets/contact_support_dialog.dart';
 
 import '../../../auth/presentation/providers/current_user_provider.dart';
 
@@ -288,6 +289,43 @@ class _PrivacySecurityScreenState extends ConsumerState<PrivacySecurityScreen> {
               onTap: _clearCache,
             ),
           ]),
+
+          const SizedBox(height: 24),
+
+          // ── CONTACT & DATA PROTECTION OFFICER ──
+          _sectionHeader('CONTACT & DATA PROTECTION OFFICER', Icons.contact_mail_rounded),
+          _buildCard([
+            _tile(
+              icon: Icons.phone_in_talk_rounded,
+              iconColor: const Color(0xFF10B981),
+              title: 'Telephone Lines',
+              subtitle: '08107416745 • 08131154171',
+              trailing: const Icon(Icons.arrow_forward_ios_rounded,
+                  size: 16, color: Color(0xFF94A3B8)),
+              onTap: () => ContactSupportDialog.show(context),
+            ),
+            const Divider(height: 1, indent: 56),
+            _tile(
+              icon: Icons.email_outlined,
+              iconColor: const Color(0xFF4A43EB),
+              title: 'Support & DPO Email',
+              subtitle: 'agentcustomercare@gmail.com\nadmin@agentmobiletech.com',
+              trailing: const Icon(Icons.arrow_forward_ios_rounded,
+                  size: 16, color: Color(0xFF94A3B8)),
+              onTap: () => ContactSupportDialog.show(context),
+            ),
+            const Divider(height: 1, indent: 56),
+            _tile(
+              icon: Icons.location_on_outlined,
+              iconColor: const Color(0xFFEF4444),
+              title: 'Registered Office',
+              subtitle: 'Agent Platform Ltd, Lagos, Nigeria',
+              trailing: const Icon(Icons.arrow_forward_ios_rounded,
+                  size: 16, color: Color(0xFF94A3B8)),
+              onTap: () => ContactSupportDialog.show(context),
+            ),
+          ]),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -389,7 +427,8 @@ class _PrivacySecurityScreenState extends ConsumerState<PrivacySecurityScreen> {
             '1. Escrow Protection: Rent payments are held in licensed CBN/NDIC insured escrow accounts until the tenant verifies the property and accepts keys.\n\n'
             '2. Identity Verification: All users must complete KYC verification before executing digital tenancy agreements or rental transactions.\n\n'
             '3. Direct Communication: Landlords and tenants may interact directly via encrypted audio calls and in-app chat.\n\n'
-            '4. Property Authenticity: Listings undergo automated coordinate checks and admin verification before publication.',
+            '4. Property Authenticity: Listings undergo automated coordinate checks and admin verification before publication.\n\n'
+            '5. Contact & Inquiries: For help or questions, call 08107416745, 08131154171 or email agentcustomercare@gmail.com (Agent Platform Ltd, Lagos, Nigeria).',
             style: TextStyle(fontSize: 13, height: 1.5, color: Color(0xFF334155)),
           ),
         ),

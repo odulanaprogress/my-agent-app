@@ -20,6 +20,7 @@ import '../widgets/featured_property_section.dart';
 import '../widgets/dashboard_bottom_nav.dart';
 
 import '../../../../features/support/support_inquiry_screen.dart';
+import '../../../../core/widgets/contact_support_dialog.dart';
 
 import '../../../../core/services/user_behavior_service.dart';
 
@@ -1159,6 +1160,26 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
 
             )),
 
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ContactSupportDialog.show(context);
+                },
+                icon: const Icon(Icons.phone_in_talk_rounded, size: 18),
+                label: const Text('Contact Support (Hotlines & Email)', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+
           ],
 
         ),
@@ -1189,7 +1210,7 @@ const _tenantHelpItems = [
 
   (Icons.draw_rounded, 'Tenancy Agreement', Color(0xFF0F172A), 'Sign your digital rental agreement safely within the app.'),
 
-  (Icons.support_agent_rounded, 'Customer Support', Color(0xFF64748B), 'Raise tickets or chat with our live support team anytime.'),
+  (Icons.support_agent_rounded, 'Customer Support', Color(0xFF64748B), 'Call 08107416745, 08131154171 or email agentcustomercare@gmail.com anytime.'),
 
 ];
 

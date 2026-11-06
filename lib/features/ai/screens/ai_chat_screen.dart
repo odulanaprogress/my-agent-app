@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/ai_service.dart';
 import '../../../core/services/user_behavior_service.dart';
+import '../../../core/widgets/contact_support_dialog.dart';
 
 class AIChatScreen extends ConsumerStatefulWidget {
   const AIChatScreen({super.key});
@@ -24,9 +25,9 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
 
   // Local rule-based fallback answers for company info
   static const Map<String, String> _localAnswers = {
-    'contact': 'You can reach AGENT support at agentcustomercare@gmail.com or use the Support button on your dashboard.',
-    'phone': 'AGENT Real Estate Platform support email: agentcustomercare@gmail.com.',
-    'address': 'AGENT operates across Nigeria. Use our platform to explore properties in your preferred state.',
+    'contact': 'You can reach AGENT support directly via phone: 08107416745, 08131154171 or email: agentcustomercare@gmail.com. Our office address is Agent Platform Ltd, Lagos, Nigeria.',
+    'phone': 'AGENT Real Estate Platform support phone lines: 08107416745, 08131154171. Support email: agentcustomercare@gmail.com.',
+    'address': 'AGENT registered headquarters: Agent Platform Ltd, Lagos, Nigeria. We operate nationwide across Nigeria.',
     'payment': 'All payments on AGENT are processed through Flutterwave and held in Escrow until you take possession of the property.',
     'escrow': 'Our Escrow system ensures the landlord only receives payment once you take possession. This protects both tenant and landlord.',
     'refund': 'Refund requests are handled through our support team. Please open a support ticket for assistance.',
@@ -334,6 +335,11 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            onPressed: () => ContactSupportDialog.show(context),
+            icon: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 20),
+            tooltip: 'Call Support / View Contacts',
+          ),
           TextButton.icon(
             onPressed: _openSupportTicket,
             icon: const Icon(Icons.confirmation_number_outlined,

@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/current_user_provider.dart';
 import '../widgets/settings_tile.dart';
+import '../../../../core/widgets/contact_support_dialog.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
 
 
@@ -112,6 +113,12 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/admin'),
             ),
           ],
+          SettingsTile(
+            icon: Icons.headset_mic_rounded,
+            title: 'Contact Us & Support',
+            subtitle: '08107416745, 08131154171 • agentcustomercare@gmail.com',
+            onTap: () => ContactSupportDialog.show(context),
+          ),
           SettingsTile(
             icon: Icons.lock_outline,
             title: 'Privacy & security',

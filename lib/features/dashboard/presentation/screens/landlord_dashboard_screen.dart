@@ -1,3 +1,4 @@
+import '../../../../core/widgets/contact_support_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/foundation.dart';
@@ -2207,7 +2208,25 @@ class _LandlordDashboardScreenState
 
             )),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ContactSupportDialog.show(context);
+                },
+                icon: const Icon(Icons.phone_in_talk_rounded, size: 18),
+                label: const Text('Contact Support (Hotlines & Email)', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
 
           ],
 
@@ -2232,6 +2251,7 @@ class _LandlordDashboardScreenState
     (Icons.account_balance_wallet_outlined, 'Wallet & Escrow', Color(0xFFF59E0B), 'All payments go through escrow. Funds are released when the tenant confirms possession.'),
 
     (Icons.visibility_outlined, 'Tenant Preview', Color(0xFF8B5CF6), 'See exactly how tenants view your listings on the platform.'),
+    (Icons.support_agent_rounded, 'Customer Support', Color(0xFF64748B), 'Call 08107416745, 08131154171 • Email agentcustomercare@gmail.com'),
 
   ];
 

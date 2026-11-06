@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/services/onesignal_api_service.dart';
 import '../../../../core/services/user_behavior_service.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/widgets/contact_support_dialog.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
 
 
@@ -165,25 +167,73 @@ class _SupportInquiryScreenState extends State<SupportInquiryScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF4A43EB)),
+            tooltip: 'Call Support / View Contacts',
+            onPressed: () => ContactSupportDialog.show(context),
+          ),
+          const SizedBox(width: 6),
+        ],
       ),
       body: Column(
         children: [
-          // Info banner
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: const Color(0xFF6366F1).withValues(alpha: 0.06),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline,
-                    color: const Color(0xFF6366F1), size: 18),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Send us any questions about properties, payments, or your account.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF6366F1)),
+          // Info banner & Contact Bar
+          InkWell(
+            onTap: () => ContactSupportDialog.show(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4A43EB).withValues(alpha: 0.07),
+                border: Border(bottom: BorderSide(color: const Color(0xFF4A43EB).withValues(alpha: 0.15))),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF4A43EB),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 14),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Direct Hotlines: 08107416745 • 08131154171',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1B4B),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Email: ${AppConstants.customerCareEmail} | Lagos, Nigeria',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF4A43EB),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A43EB),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Details',
+                      style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 

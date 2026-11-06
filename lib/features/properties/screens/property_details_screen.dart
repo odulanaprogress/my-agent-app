@@ -96,7 +96,7 @@ class _PropertyDetailsScreenState
 
   // ── Helpers ────────────────────────────────────────────────────────────
   Future<void> _call(String phone) async {
-    final target = phone.trim().isEmpty ? '08030000000' : phone.trim();
+    final target = phone.trim().isEmpty ? '08107416745' : phone.trim();
     final uri = Uri(scheme: 'tel', path: target);
     try {
       await launchUrl(uri);

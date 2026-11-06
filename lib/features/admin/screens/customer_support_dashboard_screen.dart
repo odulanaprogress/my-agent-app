@@ -1026,11 +1026,14 @@ class _OverviewTab extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Agent Info',
+                  const Text('Platform & Support Info',
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 12),
+                  _infoRow(Icons.phone_outlined, '08107416745 • 08131154171'),
                   _infoRow(Icons.email_outlined, 'agentcustomercare@gmail.com'),
+                  _infoRow(Icons.admin_panel_settings_outlined, 'agentadminsupport@gmail.com'),
+                  _infoRow(Icons.location_on_outlined, 'Agent Platform Ltd, Lagos, Nigeria'),
                   _infoRow(Icons.verified_user_outlined, 'Customer Support Agent'),
                   _infoRow(Icons.business_outlined, 'AGENT Real Estate Platform'),
                 ],
