@@ -20,6 +20,8 @@ class WebRTCService {
 
   bool _hasRemoteDescription = false;
   final List<RTCIceCandidate> _pendingRemoteCandidates = [];
+  final Set<String> _processedCandidateStrings = {};
+  final Completer<void> _iceGatheringCompleter = Completer<void>();
 
   final Function(MediaStream remoteStream)? onRemoteStream;
   final VoidCallback? onConnected;
@@ -33,7 +35,10 @@ class WebRTCService {
       {'urls': 'stun:stun3.l.google.com:19302'},
       {'urls': 'stun:stun4.l.google.com:19302'},
       {'urls': 'stun:stun.cloudflare.com:3478'},
-      {'urls': 'stun:stun.services.mozilla.com'},
+      {'urls': 'stun:stun.nextcloud.com:443'},
+      {'urls': 'stun:stun.nextcloud.com:3478'},
+      {'urls': 'stun:stun.sipgate.net:3478'},
+      {'urls': 'stun:stun.12voip.com:3478'},
     ],
     'sdpSemantics': 'unified-plan',
   };
@@ -180,19 +185,43 @@ class WebRTCService {
         }
       };
 
-      // Send local ICE candidates to Firestore
+      _peerConnection!.onIceGatheringState = (RTCIceGatheringState state) {
+        debugPrint('[WebRTC] ICE Gathering state: $state');
+        if (state == RTCIceGatheringState.RTCIceGatheringStateComplete) {
+          if (!_iceGatheringCompleter.isCompleted) {
+            _iceGatheringCompleter.complete();
+          }
+        }
+      };
+
+      // Send local ICE candidates to Firestore (both directly to call document array and subcollection fallback)
+      final myCandidatesField = isCaller ? 'callerCandidates' : 'receiverCandidates';
       final myCandidatesCollection = isCaller ? 'callerCandidates' : 'receiverCandidates';
       _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) async {
         if (candidate.candidate == null || candidate.candidate!.trim().isEmpty) return;
+        final candData = {
+          'candidate': candidate.candidate,
+          'sdpMid': candidate.sdpMid,
+          'sdpMLineIndex': candidate.sdpMLineIndex,
+        };
+
+        // 1. Primary: Store on the main call document via arrayUnion (guaranteed permissions, atomic real-time update)
+        try {
+          await FirebaseFirestore.instance.collection('calls').doc(callId).update({
+            myCandidatesField: FieldValue.arrayUnion([candData]),
+          });
+        } catch (e) {
+          debugPrint('[WebRTC] Error appending candidate to call doc array: $e');
+        }
+
+        // 2. Secondary fallback: subcollection
         try {
           await FirebaseFirestore.instance
               .collection('calls')
               .doc(callId)
               .collection(myCandidatesCollection)
               .add({
-            'candidate': candidate.candidate,
-            'sdpMid': candidate.sdpMid,
-            'sdpMLineIndex': candidate.sdpMLineIndex,
+            ...candData,
             'createdAt': FieldValue.serverTimestamp(),
           });
         } catch (_) {}
@@ -211,19 +240,29 @@ class WebRTCService {
         final offer = await _peerConnection!.createOffer(offerAnswerConstraints);
         await _peerConnection!.setLocalDescription(offer);
 
+        // Allow up to 800ms for initial host/srflx candidates to gather directly into localDescription SDP
+        await Future.any([
+          Future.delayed(const Duration(milliseconds: 800)),
+          _iceGatheringCompleter.future,
+        ]);
+
+        final finalOffer = await _peerConnection!.getLocalDescription() ?? offer;
+
         await FirebaseFirestore.instance.collection('calls').doc(callId).set({
-          'offer': {'type': offer.type, 'sdp': offer.sdp},
+          'offer': {'type': finalOffer.type, 'sdp': finalOffer.sdp},
           'hasOffer': true,
         }, SetOptions(merge: true));
 
-        // Listen for Answer
+        // Listen for Answer and Remote Candidates on main call doc
         _callDocSub = FirebaseFirestore.instance
             .collection('calls')
             .doc(callId)
             .snapshots()
             .listen((snap) async {
           final data = snap.data();
-          if (data != null && data['answer'] != null && !_hasRemoteDescription) {
+          if (data == null) return;
+
+          if (data['answer'] != null && !_hasRemoteDescription) {
             _hasRemoteDescription = true;
             final answer = RTCSessionDescription(
               data['answer']['sdp'],
@@ -232,6 +271,9 @@ class WebRTCService {
             await _peerConnection?.setRemoteDescription(answer);
             await _drainPendingCandidates();
           }
+
+          // Process remote ICE candidates array from receiver
+          _processRemoteCandidatesList(data['receiverCandidates']);
         });
       } else {
         // Receiver: Wait for Offer, then create Answer
@@ -241,7 +283,9 @@ class WebRTCService {
             .snapshots()
             .listen((snap) async {
           final data = snap.data();
-          if (data != null && data['offer'] != null && !_hasRemoteDescription) {
+          if (data == null) return;
+
+          if (data['offer'] != null && !_hasRemoteDescription) {
             _hasRemoteDescription = true;
             final offer = RTCSessionDescription(
               data['offer']['sdp'],
@@ -253,15 +297,26 @@ class WebRTCService {
             final answer = await _peerConnection!.createAnswer(offerAnswerConstraints);
             await _peerConnection!.setLocalDescription(answer);
 
+            // Allow up to 800ms for initial host/srflx candidates to gather directly into localDescription SDP
+            await Future.any([
+              Future.delayed(const Duration(milliseconds: 800)),
+              _iceGatheringCompleter.future,
+            ]);
+
+            final finalAnswer = await _peerConnection!.getLocalDescription() ?? answer;
+
             await FirebaseFirestore.instance.collection('calls').doc(callId).set({
-              'answer': {'type': answer.type, 'sdp': answer.sdp},
+              'answer': {'type': finalAnswer.type, 'sdp': finalAnswer.sdp},
               'hasAnswer': true,
             }, SetOptions(merge: true));
           }
+
+          // Process remote ICE candidates array from caller
+          _processRemoteCandidatesList(data['callerCandidates']);
         });
       }
 
-      // Listen for remote ICE candidates
+      // Secondary listener for remote ICE candidates via subcollection
       final remoteCandidatesCollection = isCaller ? 'receiverCandidates' : 'callerCandidates';
       _remoteCandidatesSub = FirebaseFirestore.instance
           .collection('calls')
@@ -275,6 +330,8 @@ class WebRTCService {
             if (data != null && data['candidate'] != null) {
               final candStr = data['candidate'] as String?;
               if (candStr == null || candStr.trim().isEmpty) continue;
+              if (_processedCandidateStrings.contains(candStr)) continue;
+              _processedCandidateStrings.add(candStr);
 
               final candidate = RTCIceCandidate(
                 candStr,
@@ -285,11 +342,13 @@ class WebRTCService {
               if (_hasRemoteDescription && _peerConnection != null) {
                 try {
                   await _peerConnection?.addCandidate(candidate);
+                  debugPrint('[WebRTC] Added remote subcollection ICE candidate: $candStr');
                 } catch (e) {
                   debugPrint('[WebRTC] Error adding ICE candidate: $e');
                 }
               } else {
                 _pendingRemoteCandidates.add(candidate);
+                debugPrint('[WebRTC] Queued remote subcollection ICE candidate: $candStr');
               }
             }
           }
@@ -300,10 +359,41 @@ class WebRTCService {
     }
   }
 
+  void _processRemoteCandidatesList(dynamic candidatesList) {
+    if (candidatesList is! List) return;
+    for (final item in candidatesList) {
+      if (item is Map && item['candidate'] != null) {
+        final candStr = item['candidate'] as String?;
+        if (candStr == null || candStr.trim().isEmpty) continue;
+        if (_processedCandidateStrings.contains(candStr)) continue;
+        _processedCandidateStrings.add(candStr);
+
+        final candidate = RTCIceCandidate(
+          candStr,
+          item['sdpMid'] as String?,
+          (item['sdpMLineIndex'] as num?)?.toInt(),
+        );
+
+        if (_hasRemoteDescription && _peerConnection != null) {
+          try {
+            _peerConnection?.addCandidate(candidate);
+            debugPrint('[WebRTC] Added remote ICE candidate from call doc array: $candStr');
+          } catch (e) {
+            debugPrint('[WebRTC] Error adding ICE candidate: $e');
+          }
+        } else {
+          _pendingRemoteCandidates.add(candidate);
+          debugPrint('[WebRTC] Queued remote ICE candidate before remoteDescription: $candStr');
+        }
+      }
+    }
+  }
+
   Future<void> _drainPendingCandidates() async {
     for (final candidate in List.from(_pendingRemoteCandidates)) {
       try {
         await _peerConnection?.addCandidate(candidate);
+        debugPrint('[WebRTC] Drained pending candidate: ${candidate.candidate}');
       } catch (e) {
         debugPrint('[WebRTC] Error draining pending candidate: $e');
       }
@@ -354,6 +444,9 @@ class WebRTCService {
       await _peerConnection?.close();
       await _peerConnection?.dispose();
       _peerConnection = null;
+
+      _pendingRemoteCandidates.clear();
+      _processedCandidateStrings.clear();
 
       localRenderer?.srcObject = null;
       await localRenderer?.dispose();

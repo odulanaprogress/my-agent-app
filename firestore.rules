@@ -209,6 +209,9 @@ service cloud.firestore {
         request.auth.uid == resource.data.receiverId ||
         isAdmin()
       );
+      match /{allChildren=**} {
+        allow read, write: if signedIn();
+      }
     }
 
     // ──────────────────────────────────────────

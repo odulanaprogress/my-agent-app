@@ -119,7 +119,12 @@ class CallService {
         createdAt: DateTime.now(),
       );
 
-      await callDoc.set(call.toMap());
+      final callData = {
+        ...call.toMap(),
+        'callerCandidates': [],
+        'receiverCandidates': [],
+      };
+      await callDoc.set(callData);
 
       // Notify the receiver with both in-app notification and OneSignal push
       await OneSignalApiService.sendNotification(
@@ -197,7 +202,12 @@ class CallService {
         createdAt: DateTime.now(),
       );
 
-      await callDoc.set(call.toMap());
+      final callData = {
+        ...call.toMap(),
+        'callerCandidates': [],
+        'receiverCandidates': [],
+      };
+      await callDoc.set(callData);
 
       await OneSignalApiService.sendNotification(
         receiverUids: [receiverId],
