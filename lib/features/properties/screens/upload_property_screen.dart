@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../repositories/property_repository.dart';
+import '../../../core/services/media_compression_service.dart';
 import '../../../core/services/access_control_service.dart';
 import '../../../core/widgets/kyc_gate.dart';
 import '../../verification/verification/providers/verification_provider.dart';
@@ -82,18 +83,35 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
 
   // ── Media pickers ────────────────────────────────────────────────────────
   Future<void> _pickImages() async {
-    final images = await picker.pickMultiImage(imageQuality: 80);
+    final images = await picker.pickMultiImage();
     if (images.isNotEmpty) {
+      final rawFiles = images.map((e) => File(e.path)).toList();
+      _snack('Optimizing photos to fit under 10MB limit...', success: true);
+      final optimized = await MediaCompressionService.compressImages(rawFiles);
+      final totalBytes = MediaCompressionService.calculateTotalImageSize(optimized);
+      if (totalBytes > MediaCompressionService.maxTotalImageBytes) {
+        _snack('Selected images total ${MediaCompressionService.formatBytes(totalBytes)}. Max allowed is 10 MB. Please select fewer photos.');
+        return;
+      }
       setState(() {
-        selectedImages = images.map((e) => File(e.path)).toList();
+        selectedImages = optimized;
       });
+      _snack('${optimized.length} photos ready (${MediaCompressionService.formatBytes(totalBytes)}) ✅', success: true);
     }
   }
 
   Future<void> _pickVideo() async {
     final video = await picker.pickVideo(source: ImageSource.gallery);
     if (video != null) {
-      setState(() => selectedVideo = File(video.path));
+      final vFile = File(video.path);
+      final error = MediaCompressionService.validateVideo(vFile);
+      if (error != null) {
+        _snack(error);
+        return;
+      }
+      final size = vFile.existsSync() ? vFile.lengthSync() : 0;
+      setState(() => selectedVideo = vFile);
+      _snack('Video selected (${MediaCompressionService.formatBytes(size)}) ✅', success: true);
     }
   }
 
@@ -118,6 +136,18 @@ class _UploadPropertyScreenState extends ConsumerState<UploadPropertyScreen> {
 
     if (selectedImages.isEmpty) {
       _snack('Please select at least one property image.');
+      return;
+    }
+
+    final totalImgBytes = MediaCompressionService.calculateTotalImageSize(selectedImages);
+    if (totalImgBytes > MediaCompressionService.maxTotalImageBytes) {
+      _snack('Total image size (${MediaCompressionService.formatBytes(totalImgBytes)}) exceeds 10 MB limit.');
+      return;
+    }
+
+    final videoError = MediaCompressionService.validateVideo(selectedVideo);
+    if (videoError != null) {
+      _snack(videoError);
       return;
     }
 

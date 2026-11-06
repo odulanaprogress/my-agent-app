@@ -47,11 +47,7 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Verification',
             onTap: () => context.push('/verification'),
           ),
-          SettingsTile(
-            icon: Icons.chat_bubble_outline,
-            title: 'Chat Conversations',
-            onTap: () => context.push('/conversations'),
-          ),
+
           SettingsTile(
             icon: Icons.wallet_outlined,
             title: 'My Wallet',
@@ -117,14 +113,10 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ],
           SettingsTile(
-            icon: Icons.notifications,
-            title: 'Notifications',
-            onTap: () {},
-          ),
-          SettingsTile(
             icon: Icons.lock_outline,
             title: 'Privacy & security',
-            onTap: () {},
+            subtitle: 'Biometrics, passwords, NDPR & permissions',
+            onTap: () => context.push('/privacy-security'),
           ),
 
           SettingsTile(

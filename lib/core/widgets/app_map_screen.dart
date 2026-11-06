@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
+import 'package:agent_app/core/services/permission_service.dart';
 
 /// Full-screen in-app Google Maps viewer with interactive touch controls.
 class AppMapScreen extends StatefulWidget {
@@ -22,6 +23,15 @@ class AppMapScreen extends StatefulWidget {
     required String locationQuery,
     String? title,
   }) async {
+    // 1. On mobile devices, require location permission first.
+    // If user denies or taps anywhere outside the dialog, stop and do not open map.
+    if (!kIsWeb) {
+      final allowed = await PermissionService.requestLocationPermission(context);
+      if (!allowed || !context.mounted) {
+        return;
+      }
+    }
+
     final query = Uri.encodeComponent(locationQuery.trim());
     final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
 

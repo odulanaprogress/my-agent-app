@@ -21,7 +21,8 @@ import '../../features/search/presentation/screens/favorites_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
-import '../../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../../features/profile/presentation/screens/privacy_security_screen.dart';
 import '../../features/chat/presentation/screens/conversations_screen.dart';
 import '../../features/payments/presentation/screens/wallet_screen.dart';
 import '../../features/payments/presentation/screens/escrow_details_screen.dart';
@@ -421,6 +422,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           final property = state.extra as PropertyModel;
           return EditPropertyScreen(property: property);
         },
+      ),
+      GoRoute(
+        path: '/privacy-security',
+        builder: (context, state) => const PrivacySecurityScreen(),
       ),
       GoRoute(
         path: '/fingerprint',

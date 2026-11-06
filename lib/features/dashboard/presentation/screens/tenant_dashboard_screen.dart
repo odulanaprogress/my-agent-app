@@ -637,7 +637,7 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
 
                       suffixIcon: IconButton(
 
-                        onPressed: () {},
+                        onPressed: () => context.push('/search'),
 
                         icon: const Icon(
 

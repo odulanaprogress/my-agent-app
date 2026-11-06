@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/services/cloudinary_service.dart';
+import '../../../core/services/media_compression_service.dart';
 import '../models/property_model.dart';
 import 'package:agent_app/core/widgets/app_loader.dart';
 
@@ -62,24 +63,53 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late final Set<String> _selectedAmenities = Set.from(widget.property.amenities);
 
   Future<void> _pickMoreImages() async {
-    final images = await picker.pickMultiImage(imageQuality: 80);
+    final images = await picker.pickMultiImage();
     if (images.isNotEmpty) {
+      final rawFiles = images.map((e) => File(e.path)).toList();
+      _snack('Optimizing photos to fit under 10MB limit...', success: true);
+      final optimized = await MediaCompressionService.compressImages(rawFiles);
+      final totalBytes = MediaCompressionService.calculateTotalImageSize(optimized);
+      if (totalBytes > MediaCompressionService.maxTotalImageBytes) {
+        _snack('Selected images total ${MediaCompressionService.formatBytes(totalBytes)}. Max allowed is 10 MB. Please select fewer photos.');
+        return;
+      }
       setState(() {
-        newImages = images.map((e) => File(e.path)).toList();
+        newImages = optimized;
       });
+      _snack('${optimized.length} photos ready (${MediaCompressionService.formatBytes(totalBytes)}) ✅', success: true);
     }
   }
 
   Future<void> _pickVideo() async {
     final video = await picker.pickVideo(source: ImageSource.gallery);
     if (video != null) {
-      setState(() => newVideo = File(video.path));
+      final vFile = File(video.path);
+      final error = MediaCompressionService.validateVideo(vFile);
+      if (error != null) {
+        _snack(error);
+        return;
+      }
+      final size = vFile.existsSync() ? vFile.lengthSync() : 0;
+      setState(() => newVideo = vFile);
+      _snack('Video selected (${MediaCompressionService.formatBytes(size)}) ✅', success: true);
     }
   }
 
   Future<void> _save() async {
     if (titleController.text.trim().isEmpty || priceController.text.trim().isEmpty) {
       _snack('Title and price are required.');
+      return;
+    }
+
+    final totalImgBytes = MediaCompressionService.calculateTotalImageSize(newImages);
+    if (totalImgBytes > MediaCompressionService.maxTotalImageBytes) {
+      _snack('New images total (${MediaCompressionService.formatBytes(totalImgBytes)}) exceeds 10 MB limit.');
+      return;
+    }
+
+    final videoError = MediaCompressionService.validateVideo(newVideo);
+    if (videoError != null) {
+      _snack(videoError);
       return;
     }
 
