@@ -1,6 +1,16 @@
+buildscript {
+    repositories {
+        google()
+        maven { url = uri("https://maven.google.com") }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 allprojects {
     repositories {
         google()
+        maven { url = uri("https://maven.google.com") }
         mavenCentral()
     }
 }
@@ -12,6 +22,13 @@ val newBuildDir: Directory =
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {
+    buildscript {
+        repositories {
+            google()
+            maven { url = uri("https://maven.google.com") }
+            mavenCentral()
+        }
+    }
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }

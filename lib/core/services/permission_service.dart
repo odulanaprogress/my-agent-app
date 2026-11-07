@@ -10,7 +10,7 @@ class PermissionService {
     if (context.mounted) {
       final bool? proceed = await showDialog<bool>(
         context: context,
-        barrierDismissible: true,
+        barrierDismissible: false,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Row(

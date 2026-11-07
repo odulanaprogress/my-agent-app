@@ -59,6 +59,252 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
   String searchQuery = '';
 
   String? selectedCategory;
+  String? filterState;
+  num? filterMinPrice;
+  num? filterMaxPrice;
+  String? filterListingType;
+
+  bool get _hasActiveFilters =>
+      selectedCategory != null ||
+      filterState != null ||
+      filterMinPrice != null ||
+      filterMaxPrice != null ||
+      filterListingType != null;
+
+  void _showFilterModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        String? tempCategory = selectedCategory;
+        String? tempState = filterState;
+        num? tempMinPrice = filterMinPrice;
+        num? tempMaxPrice = filterMaxPrice;
+        String? tempListingType = filterListingType;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.78,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Filter Properties',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            tempCategory = null;
+                            tempState = null;
+                            tempMinPrice = null;
+                            tempMaxPrice = null;
+                            tempListingType = null;
+                          });
+                        },
+                        child: const Text('Reset All'),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20),
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        const Text(
+                          'Property Type',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: ['House', 'Apartment', 'Land', 'Commercial'].map((cat) {
+                            final isSel = tempCategory?.toLowerCase() == cat.toLowerCase();
+                            return ChoiceChip(
+                              label: Text(cat),
+                              selected: isSel,
+                              selectedColor: const Color(0xFF4A43EB).withValues(alpha: 0.15),
+                              labelStyle: TextStyle(
+                                color: isSel ? const Color(0xFF4A43EB) : Colors.black87,
+                                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                              onSelected: (val) {
+                                setModalState(() => tempCategory = val ? cat : null);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 18),
+
+                        const Text(
+                          'Listing Type',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            {'code': 'rent', 'name': 'For Rent'},
+                            {'code': 'sell', 'name': 'For Sale'},
+                            {'code': 'shortlet', 'name': 'Shortlet'},
+                          ].map((t) {
+                            final code = t['code']!;
+                            final isSel = tempListingType?.toLowerCase() == code.toLowerCase();
+                            return ChoiceChip(
+                              label: Text(t['name']!),
+                              selected: isSel,
+                              selectedColor: const Color(0xFF4A43EB).withValues(alpha: 0.15),
+                              labelStyle: TextStyle(
+                                color: isSel ? const Color(0xFF4A43EB) : Colors.black87,
+                                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                              onSelected: (val) {
+                                setModalState(() => tempListingType = val ? code : null);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 18),
+
+                        const Text(
+                          'State / Region',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: ['Lagos', 'Abuja', 'Rivers', 'Oyo', 'Ogun', 'Delta'].map((st) {
+                            final isSel = tempState?.toLowerCase() == st.toLowerCase();
+                            return ChoiceChip(
+                              label: Text(st),
+                              selected: isSel,
+                              selectedColor: const Color(0xFF4A43EB).withValues(alpha: 0.15),
+                              labelStyle: TextStyle(
+                                color: isSel ? const Color(0xFF4A43EB) : Colors.black87,
+                                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                              onSelected: (val) {
+                                setModalState(() => tempState = val ? st : null);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 18),
+
+                        const Text(
+                          'Budget / Price Range',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            {'label': 'Under ₦1M', 'min': null, 'max': 1000000},
+                            {'label': '₦1M - ₦5M', 'min': 1000000, 'max': 5000000},
+                            {'label': '₦5M - ₦20M', 'min': 5000000, 'max': 20000000},
+                            {'label': 'Above ₦20M', 'min': 20000000, 'max': null},
+                          ].map((tier) {
+                            final num? minP = tier['min'] as num?;
+                            final num? maxP = tier['max'] as num?;
+                            final isSel = tempMinPrice == minP && tempMaxPrice == maxP;
+                            return ChoiceChip(
+                              label: Text(tier['label'] as String),
+                              selected: isSel,
+                              selectedColor: const Color(0xFF4A43EB).withValues(alpha: 0.15),
+                              labelStyle: TextStyle(
+                                color: isSel ? const Color(0xFF4A43EB) : Colors.black87,
+                                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                              onSelected: (val) {
+                                setModalState(() {
+                                  if (val) {
+                                    tempMinPrice = minP;
+                                    tempMaxPrice = maxP;
+                                  } else {
+                                    tempMinPrice = null;
+                                    tempMaxPrice = null;
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            context.push('/search');
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: const Text('Advanced Search'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              selectedCategory = tempCategory;
+                              filterState = tempState;
+                              filterMinPrice = tempMinPrice;
+                              filterMaxPrice = tempMaxPrice;
+                              filterListingType = tempListingType;
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4A43EB),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: const Text('Apply Filters', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
 
 
@@ -637,19 +883,31 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
                       ),
 
                       suffixIcon: IconButton(
-
-                        onPressed: () => context.push('/search'),
-
-                        icon: const Icon(
-
-                          Icons.tune_rounded,
-
-                          color: Color(0xFF0F172A),
-
-                          size: 18,
-
+                        tooltip: 'Filter listings',
+                        onPressed: _showFilterModal,
+                        icon: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            const Icon(
+                              Icons.tune_rounded,
+                              color: Color(0xFF0F172A),
+                              size: 19,
+                            ),
+                            if (_hasActiveFilters)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF4A43EB),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-
                       ),
 
                     ),
@@ -763,11 +1021,12 @@ class _TenantDashboardScreenState extends ConsumerState<TenantDashboardScreen> {
 
 
                 FeaturedPropertySection(
-
                   searchQuery: searchQuery,
-
                   category: selectedCategory,
-
+                  state: filterState,
+                  minPrice: filterMinPrice,
+                  maxPrice: filterMaxPrice,
+                  listingType: filterListingType,
                 ),
 
                 const SizedBox(height: 20),

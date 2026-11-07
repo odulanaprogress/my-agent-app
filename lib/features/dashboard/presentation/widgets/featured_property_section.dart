@@ -12,11 +12,19 @@ import 'package:shimmer/shimmer.dart';
 class FeaturedPropertySection extends ConsumerStatefulWidget {
   final String searchQuery;
   final String? category;
+  final String? state;
+  final num? minPrice;
+  final num? maxPrice;
+  final String? listingType;
 
   const FeaturedPropertySection({
     super.key,
     this.searchQuery = '',
     this.category,
+    this.state,
+    this.minPrice,
+    this.maxPrice,
+    this.listingType,
   });
 
   @override
@@ -59,11 +67,23 @@ class _FeaturedPropertySectionState extends ConsumerState<FeaturedPropertySectio
 
         final filtered = properties.where((p) {
           final matchesCategory = widget.category == null ||
+              widget.category!.isEmpty ||
               p.category.toLowerCase() == widget.category!.toLowerCase();
-          final matchesSearch = widget.searchQuery.isEmpty ||
-              p.title.toLowerCase().contains(widget.searchQuery) ||
-              p.location.toLowerCase().contains(widget.searchQuery);
-          return matchesCategory && matchesSearch;
+          final q = widget.searchQuery.toLowerCase();
+          final matchesSearch = q.isEmpty ||
+              p.title.toLowerCase().contains(q) ||
+              p.location.toLowerCase().contains(q) ||
+              p.state.toLowerCase().contains(q) ||
+              p.category.toLowerCase().contains(q);
+          final matchesState = widget.state == null ||
+              widget.state!.isEmpty ||
+              p.state.toLowerCase().contains(widget.state!.toLowerCase());
+          final matchesMinPrice = widget.minPrice == null || p.price >= widget.minPrice!;
+          final matchesMaxPrice = widget.maxPrice == null || p.price <= widget.maxPrice!;
+          final matchesType = widget.listingType == null ||
+              widget.listingType!.isEmpty ||
+              p.listingType.toLowerCase() == widget.listingType!.toLowerCase();
+          return matchesCategory && matchesSearch && matchesState && matchesMinPrice && matchesMaxPrice && matchesType;
         }).toList();
 
         if (filtered.isEmpty) {
